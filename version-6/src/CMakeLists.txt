@@ -1,0 +1,2 @@
+add_subdirectory(baselines)
+add_subdirectory(SpConv)

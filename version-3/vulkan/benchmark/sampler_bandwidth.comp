@@ -1,0 +1,20 @@
+#version 450
+
+layout (local_size_x = 64) in;
+
+// The input tensors bind index is relative to index in parameter passed
+layout (binding = 0) uniform sampler2D in_a;
+layout (constant_id = 0) const float tensor_size_f = 0;
+
+shared vec4 sub_tensor_1[64];
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    uint loop = uint(tensor_size_f);
+    for (uint x = 0; x < loop; ++x) {
+
+        ivec2 ipos =  ivec2(index, 0);
+        sub_tensor_1[index] = texelFetch(in_a, ipos, 0);
+        barrier();
+    }
+}

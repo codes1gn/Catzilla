@@ -1,0 +1,3 @@
+*.o
+*.cubin
+test_gemm

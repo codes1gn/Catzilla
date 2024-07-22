@@ -1,0 +1,12 @@
+[submodule "third_party/sputnik"]
+	path = third_party/sputnik
+	url = git@github.com:KevinWu2017/sputnik.git
+[submodule "third_party/argparse"]
+	path = third_party/argparse
+	url = git@github.com:p-ranav/argparse.git
+[submodule "third_party/cutlass"]
+	path = third_party/cutlass
+	url = git@github.com:NVIDIA/cutlass.git
+[submodule "third_party/cudnn-frontend"]
+	path = third_party/cudnn-frontend
+	url = git@github.com:NVIDIA/cudnn-frontend.git
