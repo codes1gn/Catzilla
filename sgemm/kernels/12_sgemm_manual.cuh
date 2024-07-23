@@ -3,11 +3,11 @@
 #define A(i,j) A[(i) + (j)*lda]
 #define B(i,j) B[(i) + (j)*ldb]
 #define C(i,j) C[(i) + (j)*ldc]
-#define sa8(i,j) sa8[((j)<<7) + (i)]
-#define sb8(i,j) sb8[((j)<<7) + (i)]
-#define MS_8 128
-#define NS_8 128
-#define KS_8 8
+#define sa9(i,j) sa9[((j)<<7) + (i)]
+#define sb9(i,j) sb9[((j)<<7) + (i)]
+#define MS_9 128
+#define NS_9 128
+#define KS_9 8
 //v1 += v2 * s3, vector scaling
 #define vscal(v1, v2, s3)\
     v1.x+=v2.x*s3;\
@@ -29,37 +29,42 @@
 // more workloads per thread. 8x8 micro kernel.
 // adopt vetorized load/store
 __global__  __launch_bounds__(256)
-void mysgemm_v8(int M, int N, int K, float alpha, float* A, float* B, float beta, float* C){
+void sgemm_12(float* A, float* B, float* C, float alpha, float beta, int M, int N, int K){
     int lda = M, ldb = K, ldc = M;
     int tx = threadIdx.x;
     int bx = blockIdx.x, by = blockIdx.y;
-    int row_a = (tx&31)<<2, col_a = tx>>5;
+    int warp_id = tx>>5;
+    int lane_id = tx&31;
+    int warp_row = warp_id & 3, warp_col = warp_id >> 2;
+    int row_w = lane_id&3, col_w = lane_id>>2;
     int row_b = (tx&1)<<2, col_b = tx>>1;
     int lda8 = lda<<3;
-    int row_c = (tx&15)<<3, col_c = (tx>>4)<<3;
+    int row_c = (warp_row<<5) + (row_w<<3), col_c = (warp_col<<6) + (col_w<<3);
+    int row_a = (tx&31)<<2, col_a = tx>>5;
     A = &A((bx<<7),0);
     B = &B(0,(by<<7));
     C = &C((bx<<7),(by<<7));//the TB size is 128.
-    __shared__ float sa8[1024];
-    __shared__ float sb8[1024];
+    __shared__ float sa9[1024];
+    __shared__ float sb9[1024];
     float4 Av1, Av2, Bv1, Bv2, Cv[16], Cres[16];
     memset(Cres, 0, sizeof(Cres));//clear registers
-    for (int k_count = 0; k_count<K; k_count+=KS_8){
+    for (int k_count = 0; k_count<K; k_count+=KS_9){
+        /*packing A and B into shared memory*/
         vload(Av1, &A(row_a,col_a))
         vload(Bv1, &B(row_b,col_b))
-        ((float4 *)sa8)[tx] = Av1;
-        sb8(col_b,row_b)=Bv1.x;
-        sb8(col_b,row_b+1)=Bv1.y;
-        sb8(col_b,row_b+2)=Bv1.z;
-        sb8(col_b,row_b+3)=Bv1.w;
+        ((float4 *)sa9)[tx] = Av1;
+        sb9(col_b,row_b)=Bv1.x;
+        sb9(col_b,row_b+1)=Bv1.y;
+        sb9(col_b,row_b+2)=Bv1.z;
+        sb9(col_b,row_b+3)=Bv1.w;
         A+=lda8;B+=8;
         __syncthreads();
         #pragma unroll
-        for (int inner_k_count=0;inner_k_count<KS_8;inner_k_count++){
-            vload(Av1, &sa8(row_c,inner_k_count))
-            vload(Av2, &sa8(row_c+4,inner_k_count))
-            vload(Bv1, &sb8(col_c,inner_k_count))
-            vload(Bv2, &sb8(col_c+4,inner_k_count))
+        for (int inner_k_count=0;inner_k_count<KS_9;inner_k_count++){
+            vload(Av1, &sa9(row_c,inner_k_count))
+            vload(Av2, &sa9(row_c+4,inner_k_count))
+            vload(Bv1, &sb9(col_c,inner_k_count))
+            vload(Bv2, &sb9(col_c+4,inner_k_count))
             vscal(Cres[0], Av1, Bv1.x)
             vscal(Cres[1], Av2, Bv1.x)
             vscal(Cres[2], Av1, Bv1.y)

@@ -126,7 +126,7 @@ void runCublasFP32(cublasHandle_t handle, int M, int N, int K, float alpha,
   // cuBLAS uses column-major order. So we change the order of our row-major A &
   // B, since (B^T*A^T)^T = (A*B)
   // This runs cuBLAS in full fp32 mode
-  cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH);
+  // cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH);
   cublasGemmEx(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, M, K, &alpha, B, CUDA_R_32F,
                N, A, CUDA_R_32F, K, &beta, C, CUDA_R_32F, N, CUBLAS_COMPUTE_32F,
                CUBLAS_GEMM_DEFAULT_TENSOR_OP);
@@ -275,6 +275,22 @@ void runSgemmHardcoded(int M, int N, int K, float alpha, float *A, float *B,
                                     K);
 }
 
+void runSgemm11(int M, int N, int K, float alpha, float *A, float *B,
+                       float beta, float *C) {
+  dim3 blockDim(256);
+  dim3 gridDim(CEIL_DIV(M,128),CEIL_DIV(N,128));
+  sgemm_12<<<gridDim, blockDim>>>(A, B, C, alpha, beta, M, N,
+                                    K);
+}
+
+void runSgemm12(int M, int N, int K, float alpha, float *A, float *B,
+                       float beta, float *C) {
+  dim3 blockDim(256);
+  dim3 gridDim(CEIL_DIV(M,128),CEIL_DIV(N,128));
+  sgemm_12<<<gridDim, blockDim>>>(A, B, C, alpha, beta, M, N,
+                                    K);
+}
+
 void runSgemmAutotuned(int M, int N, int K, float alpha, float *A, float *B,
                        float beta, float *C) {
   // A100
@@ -414,6 +430,12 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
     break;
   case 10:
     runSgemmHardcoded(M, N, K, alpha, A, B, beta, C);
+    break;
+  case 11:
+    runSgemm11(M, N, K, alpha, A, B, beta, C);
+    break;
+  case 12:
+    runSgemm12(M, N, K, alpha, A, B, beta, C);
     break;
   default:
     throw std::invalid_argument("Unknown kernel number");

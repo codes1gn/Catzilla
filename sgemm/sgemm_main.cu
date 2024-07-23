@@ -19,10 +19,10 @@ int main(int argc, char **argv) {
 
   // get kernel number
   int kernel_num = std::stoi(argv[1]);
-  if (kernel_num < 0 || kernel_num > 10) {
-    std::cerr << "Please enter a valid kernel number (0-9)" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  // if (kernel_num < 0 || kernel_num > 10) {
+  //   std::cerr << "Please enter a valid kernel number (0-9)" << std::endl;
+  //   exit(EXIT_FAILURE);
+  // }
 
   // get environment variable for device
   int deviceIdx = 0;

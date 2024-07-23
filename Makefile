@@ -59,6 +59,7 @@ build: query-gpu-arch
 	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Release .. \
 		-DCUDA_COMPUTE_CAPABILITY=$(CUDA_COMPUTE_CAPABILITY) \
 		-DCMAKE_CUDA_COMPILER=nvcc \
+		-DCMAKE_CUDA_FLAGS="-O3 -maxrregcount=128 --ptxas-options=-v" \
 		-GNinja
 	@ninja -C $(BUILD_DIR)
 

@@ -31,7 +31,7 @@
 // more workloads per thread. 8x8 micro kernel.
 // adopt vetorized load/store
 __global__  __launch_bounds__(256)
-void mysgemm_v10(int M, int N, int K, float alpha, float* A, float* B, float beta, float* C){
+void sgemm_11(float* A, float* B, float* C, float alpha, float beta, int M, int N, int K){
     int lda = M, ldb = K, ldc = M;
     int tx = threadIdx.x;
     int bx = blockIdx.x, by = blockIdx.y;
