@@ -1,10 +1,14 @@
+
 #pragma once
 
-#include <cuda_runtime.h>
+#include <algorithm>
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
 #include <cublas_v2.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cuda_runtime.h>
 
+#define CEIL_DIV(M, N) (((M) + (N)-1) / (N))
 #define OFFSET(row, col, ld) ((row)*(ld)+(col))
 #define FETCH_FLOAT4(pointer) (reinterpret_cast<float4*>(&(pointer))[0])
 
@@ -13,7 +17,8 @@ template<const int BM,
         const int BK,
         const int TM,
         const int TN>
-__global__ void mysgemm_v7(int M, int N, int K, float alpha, float *A, float *B, float beta, float *C) {
+__global__ void sgemmDoublebuffer(int M, int N, int K, float alpha, float *A,
+                               float *B, float beta, float *C) {
     int bx = blockIdx.x;
     int by = blockIdx.y;
 
@@ -178,3 +183,4 @@ __global__ void mysgemm_v7(int M, int N, int K, float alpha, float *A, float *B,
         }
     }
 }
+
