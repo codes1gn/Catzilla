@@ -1,5 +1,9 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cublas_v2.h>
 
 #define BLOCK_X 16
 #define BLOCK_Y 16
@@ -324,13 +328,3 @@ __global__ void gemm_kernel_NN(
     }
 }
 
-void OptsGemm(int m, int n, int k, float* d_A, float* d_B, float* d_C,
-              float alpha, float beta) {
-    constexpr int BLOCK_DIM = 128;
-    // subm, subn, subk
-    dim3 block(256);
-    dim3 grid((m + BLOCK_DIM - 1) / BLOCK_DIM, (n + BLOCK_DIM - 1) / BLOCK_DIM);
-
-    gemm_kernel_NN<<<grid, block>>>(d_A, d_B, (float4*)d_C, alpha, beta, m, n,
-                                    k);
-}

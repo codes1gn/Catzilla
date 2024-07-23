@@ -1,5 +1,6 @@
 ## TODOLIST
 * unify all implmenetation variants, to make them more readable under one style
+  ** v1 done
 * refactor all kernels into utils that can be extract to simplify the implementation
 * optimise with all tricks: tiling, caching, coalescing memory access, swizzle, multi-buffer, pipeline, vectorise, tensorise(tensor core)
 * beat cublas

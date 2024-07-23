@@ -9,3 +9,4 @@
 #include "kernels/7_kernel_autotuned.cuh"
 #include "kernels/8_kernel_warptiling.cuh"
 #include "kernels/9_kernel_doublebuffer.cuh"
+#include "kernels/10_kernel_hardcoded.cuh"

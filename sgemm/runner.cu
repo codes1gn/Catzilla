@@ -265,6 +265,16 @@ void runSgemmDoublebuffer(int M, int N, int K, float alpha, float *A, float *B,
   }
 }
 
+void runSgemmHardcoded(int M, int N, int K, float alpha, float *A, float *B,
+                       float beta, float *C) {
+  constexpr int BLOCK_DIM = 128;
+  // subm, subn, subk
+  dim3 block(256);
+  dim3 grid((M + BLOCK_DIM - 1) / BLOCK_DIM, (N + BLOCK_DIM - 1) / BLOCK_DIM);
+  gemm_kernel_NN<<<grid, block>>>(A, B, (float4*)C, alpha, beta, M, N,
+                                    K);
+}
+
 void runSgemmAutotuned(int M, int N, int K, float alpha, float *A, float *B,
                        float beta, float *C) {
   // A100
@@ -401,6 +411,9 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
     break;
   case 9:
     runSgemmDoublebuffer(M, N, K, alpha, A, B, beta, C);
+    break;
+  case 10:
+    runSgemmHardcoded(M, N, K, alpha, A, B, beta, C);
     break;
   default:
     throw std::invalid_argument("Unknown kernel number");

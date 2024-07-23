@@ -6,7 +6,7 @@ BUILD_DIR := build
 BENCHMARK_DIR := benchmark_results
 CUDA_COMPUTE_CAPABILITY ?= sm_35
 DEVICE_IDX ?= 0
-KERNEL_IDX ?= 1
+KERNEL ?= 1
 
 # 根据不同的计算能力版本设置CUDA_COMPUTE_CAPABILITY
 GPU_CC=$(shell nvidia-smi --id=0 --query-gpu=compute_cap --format=csv,noheader)
@@ -79,12 +79,12 @@ cuobjdump: build
 # Usage: make profile KERNEL=<integer> PREFIX=<optional string>
 profile: build
 	@mkdir -p $(BENCHMARK_DIR)
-	@DEVICE=$(DEVICE_IDX) ncu --set full --export $(BENCHMARK_DIR)/$(PREFIX)kernel_$(KERNEL_IDX) --force-overwrite $(BUILD_DIR)/sgemm/sgemm $(KERNEL_IDX)
+	@DEVICE=$(DEVICE_IDX) ncu --set full --export $(BENCHMARK_DIR)/$(PREFIX)kernel_$(KERNEL) --force-overwrite $(BUILD_DIR)/sgemm/sgemm $(KERNEL)
 
 bench: build
-	@DEVICE=$(DEVICE_IDX) ./$(BUILD_DIR)/sgemm/sgemm ${KERNEL_IDX}
+	@DEVICE=$(DEVICE_IDX) ./$(BUILD_DIR)/sgemm/sgemm ${KERNEL}
 
-ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)kernel_$(KERNEL_IDX).ncu-rep),)
+ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)kernel_$(KERNEL).ncu-rep),)
     FILE_EXISTS := 1
 else
     FILE_EXISTS := 0
@@ -94,4 +94,4 @@ report-profile:
 	@if [ $(FILE_EXISTS) -eq 0 ]; then \
 		$(MAKE) profile; \
 	fi
-	@ncu --import $(BENCHMARK_DIR)/kernel_$(KERNEL_IDX).ncu-rep --page details
+	@ncu --import $(BENCHMARK_DIR)/kernel_$(KERNEL).ncu-rep --page details
