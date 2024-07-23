@@ -1,9 +1,10 @@
-.PHONY: all build debug clean profile bench cuobjdump
+.PHONY: all build debug clean profile report-profile bench bench-all cuobjdump
 
 CMAKE := cmake
 
 BUILD_DIR := build
-BENCHMARK_DIR := benchmark_results
+BENCH_DIR := __bench_cache__
+BENCHMARK_DIR := __profile_cache__
 CUDA_COMPUTE_CAPABILITY ?= sm_35
 DEVICE_IDX ?= 0
 KERNEL ?= 1
@@ -70,6 +71,7 @@ debug:
 
 clean:
 	@rm -rf $(BUILD_DIR)
+	@rm -rf $(BENCH_DIR)
 
 FUNCTION := $$(cuobjdump -symbols build/sgemm | grep -i Warptiling | awk '{print $$NF}')
 
@@ -96,3 +98,8 @@ report-profile:
 		$(MAKE) profile; \
 	fi
 	@ncu --import $(BENCHMARK_DIR)/kernel_$(KERNEL).ncu-rep --page details
+
+bench-all: build
+	@mkdir -p $(BENCH_DIR) 
+	@bash tools/bench-all-kernels.sh
+
