@@ -19,7 +19,7 @@ add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-G;-src-i
 
 # Configure header file search paths
 include_directories(${CUDA_INCLUDE_DIRS})
-include_directories(${PROJECT_SOURCE_DIR}/sgemm)
 # Configure the source file path to be compiled
 add_subdirectory(${PROJECT_SOURCE_DIR}/sgemm)
+add_subdirectory(${PROJECT_SOURCE_DIR}/convolution)
 
