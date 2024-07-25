@@ -17,9 +17,14 @@ set(CMAKE_CXX_STANDARD 20)
 add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-G;-src-in-ptx>")
 # add_compile_options("--ptxas-options=-v")
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+
 # Configure header file search paths
 include_directories(${CUDA_INCLUDE_DIRS})
 # Configure the source file path to be compiled
-add_subdirectory(${PROJECT_SOURCE_DIR}/sgemm)
-add_subdirectory(${PROJECT_SOURCE_DIR}/convolution)
+add_subdirectory(${PROJECT_SOURCE_DIR}/references)
 
+# Catzilla impls on various operators
+add_subdirectory(${PROJECT_SOURCE_DIR}/recipes)

@@ -76,18 +76,18 @@ clean:
 FUNCTION := $$(cuobjdump -symbols build/sgemm | grep -i Warptiling | awk '{print $$NF}')
 
 cuobjdump: build
-	@cuobjdump -arch sm_86 -sass -fun $(FUNCTION) build/sgemm/sgemm | c++filt > build/cuobjdump.sass
-	@cuobjdump -arch sm_86 -ptx -fun $(FUNCTION) build/sgemm/sgemm | c++filt > build/cuobjdump.ptx
+	@cuobjdump -arch sm_86 -sass -fun $(FUNCTION) $(BUILD_DIR)/bin/catzilla-sgemm | c++filt > build/cuobjdump.sass
+	@cuobjdump -arch sm_86 -ptx -fun $(FUNCTION) $(BUILD_DIR)/bin/catzilla-sgemm | c++filt > build/cuobjdump.ptx
 
 # Usage: make profile KERNEL=<integer> PREFIX=<optional string>
 profile: build
 	@mkdir -p $(BENCHMARK_DIR)
-	@DEVICE=$(DEVICE_IDX) ncu --set full --export $(BENCHMARK_DIR)/$(PREFIX)kernel_$(KERNEL) --force-overwrite $(BUILD_DIR)/sgemm/sgemm $(KERNEL)
+	@DEVICE=$(DEVICE_IDX) ncu --set full --export $(BENCHMARK_DIR)/$(PREFIX)catzilla-kernel-$(KERNEL) --force-overwrite $(BUILD_DIR)/bin/catzilla-sgemm $(KERNEL)
 
 bench: build
-	@DEVICE=$(DEVICE_IDX) ./$(BUILD_DIR)/sgemm/sgemm ${KERNEL}
+	@DEVICE=$(DEVICE_IDX) $(BUILD_DIR)/bin/catzilla-sgemm ${KERNEL}
 
-ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)kernel_$(KERNEL).ncu-rep),)
+ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)catzilla-kernel-$(KERNEL).ncu-rep),)
     FILE_EXISTS := 1
 else
     FILE_EXISTS := 0
@@ -97,9 +97,12 @@ report-profile:
 	@if [ $(FILE_EXISTS) -eq 0 ]; then \
 		$(MAKE) profile; \
 	fi
-	@ncu --import $(BENCHMARK_DIR)/kernel_$(KERNEL).ncu-rep --page details
+	@ncu --import $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).ncu-rep --page details > \
+		$(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).report && \
+		vim $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).report
 
-bench-all: build
+# OTHER util targets
+bench-ref-sgemm: build
 	@mkdir -p $(BENCH_DIR) 
 	@bash tools/bench-all-kernels.sh
 
