@@ -82,10 +82,10 @@ cuobjdump: build
 # Usage: make profile KERNEL=<integer> PREFIX=<optional string>
 profile: build
 	@mkdir -p $(BENCHMARK_DIR)
-	@DEVICE=$(DEVICE_IDX) ncu --set full --export $(BENCHMARK_DIR)/$(PREFIX)kernel_$(KERNEL) --force-overwrite $(BUILD_DIR)/sgemm/sgemm $(KERNEL)
+	@ncu --set full --export $(BENCHMARK_DIR)/$(PREFIX)kernel_$(KERNEL) --force-overwrite $(BUILD_DIR)/sgemm/sgemm -version=$(KERNEL) -device=$(DEVICE_IDX)
 
 bench: build
-	@DEVICE=$(DEVICE_IDX) ./$(BUILD_DIR)/sgemm/sgemm ${KERNEL}
+	@./$(BUILD_DIR)/sgemm/sgemm -version ${KERNEL} -device 1 -repeat 100 -warmup 10
 
 ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)kernel_$(KERNEL).ncu-rep),)
     FILE_EXISTS := 1

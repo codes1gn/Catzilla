@@ -21,5 +21,6 @@ add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-G;-src-i
 include_directories(${CUDA_INCLUDE_DIRS})
 # Configure the source file path to be compiled
 add_subdirectory(${PROJECT_SOURCE_DIR}/sgemm)
-add_subdirectory(${PROJECT_SOURCE_DIR}/convolution)
+# only available in 80++ env
+# add_subdirectory(${PROJECT_SOURCE_DIR}/convolution)
 

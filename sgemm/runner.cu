@@ -437,6 +437,9 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
   case 12:
     runSgemm12(M, N, K, alpha, A, B, beta, C);
     break;
+  case 13:
+    neo_sgemm(M, N, K, alpha, A, B, beta, C);
+    break;
   default:
     throw std::invalid_argument("Unknown kernel number");
   }

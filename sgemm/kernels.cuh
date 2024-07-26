@@ -12,3 +12,7 @@
 #include "kernels/10_kernel_hardcoded.cuh"
 #include "kernels/11_sgemm_manual.cuh"
 #include "kernels/12_sgemm_manual.cuh"
+
+// neo implementation
+#include "neosgemm/1_kernel.cuh"
+
