@@ -66,7 +66,11 @@ build: query-gpu-arch
 
 debug:
 	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug .. -DCMAKE_CUDA_COMPILER=nvcc -GNinja
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug .. \
+		-DCUDA_COMPUTE_CAPABILITY=$(CUDA_COMPUTE_CAPABILITY) \
+		-DCMAKE_CUDA_COMPILER=nvcc \
+		-DCMAKE_CUDA_FLAGS="-O3 -maxrregcount=128 --ptxas-options=-v" \
+		-GNinja
 	@ninja -C $(BUILD_DIR)
 
 clean:
@@ -82,10 +86,10 @@ cuobjdump: build
 # Usage: make profile KERNEL=<integer> PREFIX=<optional string>
 profile: build
 	@mkdir -p $(BENCHMARK_DIR)
-	@DEVICE=$(DEVICE_IDX) ncu --set full --export $(BENCHMARK_DIR)/$(PREFIX)catzilla-kernel-$(KERNEL) --force-overwrite $(BUILD_DIR)/bin/catzilla-sgemm $(KERNEL)
+	@ncu --set full --export $(BENCHMARK_DIR)/$(PREFIX)kernel_$(KERNEL) --force-overwrite $(BUILD_DIR)/bin/catzilla-sgemm -version=$(KERNEL) -device=$(DEVICE_IDX)
 
 bench: build
-	@DEVICE=$(DEVICE_IDX) $(BUILD_DIR)/bin/catzilla-sgemm ${KERNEL}
+	@./$(BUILD_DIR)/bin/catzilla-sgemm -version ${KERNEL} -device 0 -repeat 100 -warmup 10
 
 ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)catzilla-kernel-$(KERNEL).ncu-rep),)
     FILE_EXISTS := 1
