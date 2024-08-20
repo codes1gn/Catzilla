@@ -33,6 +33,10 @@ __device__ int tile_addr_ex_(int x_tile, int y_tile, int x_offset, int y_offset,
   return idx;
 }
 
+/*
+ * gmem access coalescing
+ * smem stationary
+*/
 template <const int M_TILE, const int N_TILE, const int K_TILE>
 __global__ void catzilla_sgemm_v1(int M, int N, int K, float alpha,
                                        float *lhs, float *rhs,
@@ -43,13 +47,14 @@ __global__ void catzilla_sgemm_v1(int M, int N, int K, float alpha,
   int tid_x = threadIdx.x;
   int tid_y = threadIdx.y;
 
-  // 申请共享内存空间
+  // smem stationary
   __shared__ float lhs_shared[M_TILE * K_TILE];
   __shared__ float rhs_shared[K_TILE * N_TILE];
   __shared__ float output_shared[M_TILE * N_TILE];
 
-  // TODO change to tiled size, not full size
+  // coalescing
   output_shared[tile_addr_(tid_x, tid_y, 1, N_TILE)] = 0.0;
+
   float partial_sum = 0.;
   for (int k = 0; k < CEIL_DIV(K, K_TILE); k++) { // range(0, 128, 1)
       // 缓存A_tile和B_tile
@@ -58,7 +63,7 @@ __global__ void catzilla_sgemm_v1(int M, int N, int K, float alpha,
       // rhs_shared[tile_addr_(tid_x, tid_y, 1, N_TILE)] = rhs[bid_x * N_TILE + tid_y * N + k * K_TILE * N + tid_x];
       rhs_shared[tile_addr_(tid_x, tid_y, 1, N_TILE)] = rhs[tile_addr_ex_(k, bid_x, tid_y, tid_x, K_TILE, N_TILE, N, 1)];
       // 同步所有线程缓存完成
-      __syncthreads();
+      // __syncthreads();
       // float partial_sum = 0.;
       // for (int i = 0; i < K_TILE; i++) {
       //     partial_sum += lhs_shared[tid_y * K_TILE + i] * rhs_shared[i * N_TILE + tid_x];
