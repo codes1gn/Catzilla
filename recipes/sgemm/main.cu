@@ -24,6 +24,7 @@ struct Arguments {
     int REPEAT = 1000;
     int VERSION = 0;
     int DEVICE = 0;
+    int IS_PROF = 0;
 };
 
 void parse_arguments(int argc, char* argv[], Arguments& args) {
@@ -44,6 +45,8 @@ void parse_arguments(int argc, char* argv[], Arguments& args) {
             std::istringstream(argv[++i]) >> args.VERSION;
         } else if (arg == "-device" && i + 1 < argc) {
             std::istringstream(argv[++i]) >> args.DEVICE;
+        } else if (arg == "-profile" && i + 1 < argc) {
+            std::istringstream(argv[++i]) >> args.IS_PROF;
         }
     }
 }
@@ -60,6 +63,7 @@ int main(int argc, char **argv) {
   const int repeat = args.REPEAT;
   const int kernel_id = args.VERSION;
   const int deviceIdx = args.DEVICE;
+  const int isProf = args.IS_PROF;
   cudaCheck(cudaSetDevice(deviceIdx));
   printf("Running kernel %d on device %d.\n", kernel_id, deviceIdx);
 
@@ -109,10 +113,10 @@ int main(int argc, char **argv) {
   cudaCheck(cudaMemcpy(dC_ref, C, sizeof(float) * M * N, cudaMemcpyHostToDevice));
 
   std::cout << "dimensions(M=" << M << ", K=" << K << ", N=" << N << ") , alpha: " << alpha
-            << ", beta: " << beta << std::endl;
+            << ", beta: " << beta << "is prof: " << isProf << std::endl;
   // Verify the correctness of the calculation, and execute it once before the
   // kernel function timing to avoid cold start errors
-  if (kernel_id != 0) {
+  if (kernel_id != 0 && isProf < 1) {
     run_kernel(0, M, N, K, alpha, dA, dB, beta, dC_ref,
                handle); // cuBLAS
     catzilla_sgemm_exec(kernel_id, M, N, K, alpha, dA, dB, beta, dC); // Executes the kernel, modifies the result matrix

@@ -86,10 +86,17 @@ cuobjdump: build
 # Usage: make profile KERNEL=<integer> PREFIX=<optional string>
 profile: build
 	@mkdir -p $(BENCHMARK_DIR)
-	@ncu --set full --export $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL) --force-overwrite $(BUILD_DIR)/bin/catzilla-sgemm -version $(KERNEL) -device $(DEVICE_IDX) -repeat 1 -warmup 0
+	@ncu --set full --export $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL) --force-overwrite $(BUILD_DIR)/bin/catzilla-sgemm -version $(KERNEL) -device $(DEVICE_IDX) -repeat 1 -warmup 0 -profile 1
+
+summary:
+	@ncu --import $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).ncu-rep --print-summary per-kernel > \
+		$(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).summary && \
+		vim $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).summary
+
+analysis:
 	@ncu --import $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).ncu-rep --page details > \
-		$(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).report && \
-		vim $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).report
+		$(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).details && \
+		vim $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).details
 
 bench: build
 	@./$(BUILD_DIR)/bin/catzilla-sgemm -version ${KERNEL} -device 0 -repeat 333 -warmup 20
