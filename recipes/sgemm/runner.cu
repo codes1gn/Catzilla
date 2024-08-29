@@ -1,4 +1,3 @@
-#include "kernels_importer.h"
 #include "runner.h"
 #include <cmath>
 #include <cstdio>
@@ -159,9 +158,6 @@ void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
   switch (kernel_num) {
   case 0:
     runCublasFP32(handle, M, N, K, alpha, A, B, beta, C);
-    break;
-  case 1:
-    catzilla_sgemm_exec(1, M, N, K, alpha, A, B, beta, C);
     break;
   default:
     throw std::invalid_argument("Unknown kernel number");

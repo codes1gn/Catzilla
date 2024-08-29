@@ -8,6 +8,9 @@
 #include <vector>
 #include <string>
 
+#include "sgemm_impls.h"
+// TODO, promote this main and baselines/utils to top-level
+
 
 #define cudaCheck(err) (cudaCheck(err, __FILE__, __LINE__))
 
@@ -55,10 +58,10 @@ int main(int argc, char **argv) {
   const int N = args.SIZE_N;
   const int warmup = args.WARMUP;
   const int repeat = args.REPEAT;
-  const int kernel_num = args.VERSION;
+  const int kernel_id = args.VERSION;
   const int deviceIdx = args.DEVICE;
   cudaCheck(cudaSetDevice(deviceIdx));
-  printf("Running kernel %d on device %d.\n", kernel_num, deviceIdx);
+  printf("Running kernel %d on device %d.\n", kernel_id, deviceIdx);
 
   // print some device info
   // CudaDeviceInfo();
@@ -109,11 +112,10 @@ int main(int argc, char **argv) {
             << ", beta: " << beta << std::endl;
   // Verify the correctness of the calculation, and execute it once before the
   // kernel function timing to avoid cold start errors
-  if (kernel_num != 0) {
+  if (kernel_id != 0) {
     run_kernel(0, M, N, K, alpha, dA, dB, beta, dC_ref,
                handle); // cuBLAS
-    run_kernel(kernel_num, M, N, K, alpha, dA, dB, beta, dC,
-               handle); // Executes the kernel, modifies the result matrix
+    catzilla_sgemm_exec(kernel_id, M, N, K, alpha, dA, dB, beta, dC); // Executes the kernel, modifies the result matrix
     cudaCheck(cudaDeviceSynchronize());
     cudaCheck(cudaGetLastError()); // Check for async errors during kernel run
     cudaMemcpy(C, dC, sizeof(float) * M * N, cudaMemcpyDeviceToHost);
@@ -144,7 +146,7 @@ int main(int argc, char **argv) {
   cudaEventRecord(beg);
   for (int j = 0; j < repeat; j++) {
     // We don't reset dC between runs to save time
-    run_kernel(kernel_num, M, N, K, alpha, dA, dB, beta, dC, handle);
+    catzilla_sgemm_exec(kernel_id, M, N, K, alpha, dA, dB, beta, dC); // Executes the kernel, modifies the result matrix
   }
   cudaEventRecord(end);
   cudaEventSynchronize(beg);

@@ -86,27 +86,17 @@ cuobjdump: build
 # Usage: make profile KERNEL=<integer> PREFIX=<optional string>
 profile: build
 	@mkdir -p $(BENCHMARK_DIR)
-	@ncu --set full --export $(BENCHMARK_DIR)/$(PREFIX)kernel_$(KERNEL) --force-overwrite $(BUILD_DIR)/bin/catzilla-sgemm -version=$(KERNEL) -device=$(DEVICE_IDX)
+	@ncu --set full --export $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL) --force-overwrite $(BUILD_DIR)/bin/catzilla-sgemm -version $(KERNEL) -device $(DEVICE_IDX) -repeat 1 -warmup 0
+	@ncu --import $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).ncu-rep --page details > \
+		$(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).report && \
+		vim $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).report
 
 bench: build
-	@./$(BUILD_DIR)/bin/catzilla-sgemm -version ${KERNEL} -device 0 -repeat 100 -warmup 10
+	@./$(BUILD_DIR)/bin/catzilla-sgemm -version ${KERNEL} -device 0 -repeat 333 -warmup 20
 
 ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)catzilla-kernel-$(KERNEL).ncu-rep),)
     FILE_EXISTS := 1
 else
     FILE_EXISTS := 0
 endif
-
-report-profile:
-	@if [ $(FILE_EXISTS) -eq 0 ]; then \
-		$(MAKE) profile; \
-	fi
-	@ncu --import $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).ncu-rep --page details > \
-		$(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).report && \
-		vim $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).report
-
-# OTHER util targets
-bench-ref-sgemm: build
-	@mkdir -p $(BENCH_DIR) 
-	@bash tools/bench-all-kernels.sh
 
