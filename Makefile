@@ -69,7 +69,7 @@ debug:
 	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug .. \
 		-DCUDA_COMPUTE_CAPABILITY=$(CUDA_COMPUTE_CAPABILITY) \
 		-DCMAKE_CUDA_COMPILER=nvcc \
-		-DCMAKE_CUDA_FLAGS="-O3 -maxrregcount=128 --ptxas-options=-v" \
+		-DCMAKE_CUDA_FLAGS="-maxrregcount=128 --ptxas-options=-v" \
 		-GNinja
 	@ninja -C $(BUILD_DIR)
 
@@ -77,16 +77,16 @@ clean:
 	@rm -rf $(BUILD_DIR)
 	@rm -rf $(BENCH_DIR)
 
-FUNCTION := $$(cuobjdump -symbols build/sgemm | grep -i Warptiling | awk '{print $$NF}')
+FUNCTION := $$(cuobjdump -symbols build/matmul | grep -i Warptiling | awk '{print $$NF}')
 
 cuobjdump: build
-	@cuobjdump -arch sm_86 -sass -fun $(FUNCTION) $(BUILD_DIR)/bin/catzilla-sgemm | c++filt > build/cuobjdump.sass
-	@cuobjdump -arch sm_86 -ptx -fun $(FUNCTION) $(BUILD_DIR)/bin/catzilla-sgemm | c++filt > build/cuobjdump.ptx
+	@cuobjdump -arch sm_86 -sass -fun $(FUNCTION) $(BUILD_DIR)/bin/catzilla-matmul | c++filt > build/cuobjdump.sass
+	@cuobjdump -arch sm_86 -ptx -fun $(FUNCTION) $(BUILD_DIR)/bin/catzilla-matmul | c++filt > build/cuobjdump.ptx
 
 # Usage: make profile KERNEL=<integer> PREFIX=<optional string>
 profile: build
 	@mkdir -p $(BENCHMARK_DIR)
-	@ncu --set full --export $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL) --force-overwrite $(BUILD_DIR)/bin/catzilla-sgemm -version $(KERNEL) -device $(DEVICE_IDX) -repeat 1 -warmup 0 -profile 1
+	@ncu --set full --export $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL) --force-overwrite $(BUILD_DIR)/bin/catzilla-matmul -version $(KERNEL) -device $(DEVICE_IDX) -repeat 1 -warmup 0 -profile 1
 
 summary:
 	@ncu --import $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).ncu-rep --print-summary per-kernel > \
@@ -99,7 +99,7 @@ analysis:
 		vim $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).details
 
 bench: build
-	@./$(BUILD_DIR)/bin/catzilla-sgemm -version ${KERNEL} -device 0 -repeat 333 -warmup 20
+	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 333 -warmup 20
 
 ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)catzilla-kernel-$(KERNEL).ncu-rep),)
     FILE_EXISTS := 1

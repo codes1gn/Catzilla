@@ -1,5 +1,5 @@
-#ifndef CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
-#define CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
+#ifndef CATZILLA_RECIPES_UTILS_MICRO_KERNELS_H_
+#define CATZILLA_RECIPES_UTILS_MICRO_KERNELS_H_
 
 #include <cstdio>
 #include <cstdlib>
@@ -34,16 +34,4 @@ inline __device__ void matmul_kernel_128x128x32_perthread_4x4(float* lhs, float*
 }
 
 
-// convert multi-dim index to flatten-index
-inline __device__ int at_thread_(int x_offset, int y_offset, int x_stride, int y_stride) {
-  int idx = x_offset * x_stride + y_offset * y_stride;
-  return idx;
-}
-
-// convert multi-dim index of a tile-block to flatten-index
-inline __device__ int at_tile_(int x_tile, int y_tile, int x_tile_size, int y_tile_size, int x_stride, int y_stride) {
-  int idx = x_tile * x_tile_size * x_stride + y_tile * y_tile_size * y_stride;
-  return idx;
-}
-
-#endif // CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
+#endif // CATZILLA_RECIPES_UTILS_MICRO_KERNELS_H_

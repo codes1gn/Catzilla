@@ -8,7 +8,7 @@
 #include <vector>
 #include <string>
 
-#include "sgemm_impls.h"
+#include "kernel_impls.h"
 // TODO, promote this main and baselines/utils to top-level
 
 
@@ -117,9 +117,10 @@ int main(int argc, char **argv) {
   // Verify the correctness of the calculation, and execute it once before the
   // kernel function timing to avoid cold start errors
   if (kernel_id != 0 && isProf < 1) {
+    std::cout << "Verify Results\n";
     run_kernel(0, M, N, K, alpha, dA, dB, beta, dC_ref,
                handle); // cuBLAS
-    catzilla_sgemm_exec(kernel_id, M, N, K, alpha, dA, dB, beta, dC); // Executes the kernel, modifies the result matrix
+    catzilla_matmul_exec(kernel_id, M, N, K, alpha, dA, dB, beta, dC); // Executes the kernel, modifies the result matrix
     cudaCheck(cudaDeviceSynchronize());
     cudaCheck(cudaGetLastError()); // Check for async errors during kernel run
     cudaMemcpy(C, dC, sizeof(float) * M * N, cudaMemcpyDeviceToHost);
@@ -150,7 +151,7 @@ int main(int argc, char **argv) {
   cudaEventRecord(beg);
   for (int j = 0; j < repeat; j++) {
     // We don't reset dC between runs to save time
-    catzilla_sgemm_exec(kernel_id, M, N, K, alpha, dA, dB, beta, dC); // Executes the kernel, modifies the result matrix
+    catzilla_matmul_exec(kernel_id, M, N, K, alpha, dA, dB, beta, dC); // Executes the kernel, modifies the result matrix
   }
   cudaEventRecord(end);
   cudaEventSynchronize(beg);
