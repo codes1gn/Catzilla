@@ -45,6 +45,18 @@ struct Coord {
   __device__ std::tuple<int, int> to_tuple() const {
     return std::make_tuple(x, y);
   }
+
+  __device__ Coord& xor_swizzle() {
+    auto i16 = (y*32 + x) * sizeof(float) / 16;
+    auto y16 = i16 / 8;
+    auto x16 = i16 % 8;
+    auto x16_swz = y16 ^ x16;
+    auto x_swz = x16_swz * 16 / sizeof(float) % 32 + x % (16 / sizeof(float));
+    x = x_swz % 32;
+    y = x_swz / 32;
+    return *this;
+  }
+  
 };
 
 struct Matrix {

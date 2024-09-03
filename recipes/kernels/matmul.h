@@ -26,7 +26,7 @@ MxK * KxN = MxN
  * blocking tiling
  * pipeline
  * multi-buffer
- * swizzle
+ * xor_swizzle
  * unroll
  * tensor.vmm.contracts
  * vector loads
@@ -238,6 +238,7 @@ void catzilla_matmul_v3(int M, int N, int K, float alpha, float *A,
   _catzilla_matmul_v3<M_TILE, N_TILE, 32, mreg, nreg><<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
+
 // simplify with stream-style
 template <const int M_TILE_SM, const int N_TILE_SM, const int K_TILE_SM, const int M_TILE_REG, const int N_TILE_REG>
 __global__ void _catzilla_matmul_v4(int M, int N, int K, float alpha,
@@ -278,17 +279,17 @@ __global__ void _catzilla_matmul_v4(int M, int N, int K, float alpha,
     // use tile_ for out-tile thread calculation
     for (int mreg = 0; mreg < M_TILE_REG; mreg++) {
       lhs_shared_mat
-        .distribute(Coord(tid_x, tid_y*M_TILE_REG + mreg), Coord(1, K_TILE_SM)) 
+        .distribute(Coord(tid_x, tid_y*M_TILE_REG + mreg).xor_swizzle(), Coord(1, K_TILE_SM)) 
         = lhs_mat
         .tile(Coord(bid_y, k), Coord(M_TILE_SM, K_TILE_SM), Coord(K, 1))
-        .distribute(Coord(tid_x, tid_y*M_TILE_REG + mreg), Coord(1, K));
+        .distribute(Coord(tid_x, tid_y*M_TILE_REG + mreg).xor_swizzle(), Coord(1, K));
     }
     for (int nreg = 0; nreg < N_TILE_REG; nreg++) {
       rhs_shared_mat
-        .distribute(Coord(tid_x*N_TILE_REG + nreg, tid_y), Coord(1, N_TILE_SM)) 
+        .distribute(Coord(tid_x*N_TILE_REG + nreg, tid_y).xor_swizzle(), Coord(1, N_TILE_SM)) 
         = rhs_mat
         .tile(Coord(k, bid_x), Coord(K_TILE_SM, N_TILE_SM), Coord(N, 1))
-        .distribute(Coord(tid_x*N_TILE_REG + nreg, tid_y), Coord(1, N));
+        .distribute(Coord(tid_x*N_TILE_REG + nreg, tid_y).xor_swizzle(), Coord(1, N));
     }
     __syncthreads();
 
@@ -308,9 +309,9 @@ __global__ void _catzilla_matmul_v4(int M, int N, int K, float alpha,
         = alpha * partial_sum[mreg * 4 + nreg];
       out_mat
         .tile(Coord(bid_y, bid_x), Coord(M_TILE_SM, N_TILE_SM), Coord(N, 1))
-        .distribute(Coord(tid_x * N_TILE_REG + nreg, tid_y * M_TILE_REG + mreg), Coord(1, N)) 
+        .distribute(Coord(tid_x * N_TILE_REG + nreg, tid_y * M_TILE_REG + mreg).xor_swizzle(), Coord(1, N)) 
         = out_shared_mat
-        .distribute(Coord(tid_x * N_TILE_REG + nreg, tid_y * M_TILE_REG + mreg), Coord(1, N_TILE_SM));
+        .distribute(Coord(tid_x * N_TILE_REG + nreg, tid_y * M_TILE_REG + mreg).xor_swizzle(), Coord(1, N_TILE_SM));
     }
   }
 }
