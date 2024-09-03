@@ -40,7 +40,7 @@ MxK * KxN = MxN
 template <const int M_TILE, const int N_TILE, const int K_TILE>
 __global__ void _catzilla_matmul_v1(int M, int N, int K, float alpha,
                                        float *lhs, float *rhs,
-                                       float beta, float *output) {
+                                       float beta, float *out) {
   int bid_x = blockIdx.x;
   int bid_y = blockIdx.y;
 
@@ -50,10 +50,10 @@ __global__ void _catzilla_matmul_v1(int M, int N, int K, float alpha,
   // smem stationary
   __shared__ float lhs_shared[M_TILE * K_TILE];
   __shared__ float rhs_shared[K_TILE * N_TILE];
-  __shared__ float output_shared[M_TILE * N_TILE];
+  __shared__ float out_shared[M_TILE * N_TILE];
 
   // coalescing
-  output_shared[distribute_(tid_x, tid_y, 1, N_TILE)] = 0.0;
+  out_shared[distribute_(tid_x, tid_y, 1, N_TILE)] = 0.0;
 
   float partial_sum = 0.;
   for (int k = 0; k < CEIL_DIV(K, K_TILE); k++) { // range(0, 128, 1)
@@ -67,8 +67,9 @@ __global__ void _catzilla_matmul_v1(int M, int N, int K, float alpha,
     matmul_kernel_32x32x32(lhs_shared, rhs_shared, partial_sum);
     __syncthreads();
   }
-  output_shared[distribute_(tid_x, tid_y, 1, N_TILE)] = alpha * partial_sum;
-  output[tiling_(bid_y, bid_x, M_TILE, N_TILE, N, 1) + distribute_(tid_x, tid_y, 1, N)] = output_shared[distribute_(tid_x, tid_y, 1, N_TILE)];
+  out_shared[distribute_(tid_x, tid_y, 1, N_TILE)] = alpha * partial_sum;
+  out[tiling_(bid_y, bid_x, M_TILE, N_TILE, N, 1) + distribute_(tid_x, tid_y, 1, N)] = out_shared[distribute_(tid_x, tid_y, 1, N_TILE)];
+  // out[tiling_(bid_y, bid_x, M_TILE, N_TILE, N, 1) + distribute_(tid_x, tid_y, 1, N)] = alpha * partial_sum;
 }
 
 
@@ -92,7 +93,7 @@ void catzilla_matmul_v1(int M, int N, int K, float alpha, float *A,
 template <const int M_TILE_SM, const int N_TILE_SM, const int K_TILE_SM, const int M_TILE_REG, const int N_TILE_REG>
 __global__ void _catzilla_matmul_v2(int M, int N, int K, float alpha,
                                        float *lhs, float *rhs,
-                                       float beta, float *output) {
+                                       float beta, float *out) {
   int bid_x = blockIdx.x;
   int bid_y = blockIdx.y;
 
@@ -100,14 +101,18 @@ __global__ void _catzilla_matmul_v2(int M, int N, int K, float alpha,
   int tid_y = threadIdx.y;
 
   // smem stationary
-  // M=128, N=128, K=32, Mreg=4, Nreg=4
+  // M=64, N=64, K=32, Mreg=2, Nreg=2
   __shared__ float lhs_shared[M_TILE_SM * K_TILE_SM];
   __shared__ float rhs_shared[K_TILE_SM * N_TILE_SM];
-  __shared__ float output_shared[M_TILE_SM * N_TILE_SM];
-  // __shared__ float output_shared[1];
+  __shared__ float out_shared[M_TILE_SM * N_TILE_SM];
+  // __shared__ float out_shared[1];
 
-  // init output
-  output_shared[distribute_(tid_x, tid_y, 1, N_TILE_SM)] = 0.0;
+  // can remove
+  for (int mreg = 0; mreg < M_TILE_REG; mreg++) {
+    for (int nreg = 0; nreg < N_TILE_REG; nreg++) {
+      out_shared[distribute_(tid_x * N_TILE_REG + nreg, tid_y * M_TILE_REG + mreg, 1, N_TILE_SM)] = 0.;
+    }
+  }
 
   float partial_sum[M_TILE_REG * N_TILE_REG] = {0.};
 
@@ -115,27 +120,31 @@ __global__ void _catzilla_matmul_v2(int M, int N, int K, float alpha,
   for (int k = 0; k < CEIL_DIV(K, K_TILE_SM); k++) { // range(0, 128, 1)
     // use distribute_ for in-tile thread calculation
     // use tile_ for out-tile thread calculation
-    for (int m_reg = 0; m_reg < M_TILE_REG; m_reg++) {
-      lhs_shared[m_reg*K_TILE_SM + distribute_(tid_x, tid_y, 1, K_TILE_SM)] = lhs[m_reg*K + tiling_(bid_y, k, M_TILE_SM, K_TILE_SM, K, 1) + distribute_(tid_x, tid_y, 1, K)];
+    for (int mreg = 0; mreg < M_TILE_REG; mreg++) {
+      lhs_shared[distribute_(tid_x, tid_y*M_TILE_REG + mreg, 1, K_TILE_SM)] = lhs[tiling_(bid_y, k, M_TILE_SM, K_TILE_SM, K, 1) + distribute_(tid_x, tid_y*M_TILE_REG + mreg, 1, K)];
     }
-    for (int n_reg = 0; n_reg < N_TILE_REG; n_reg++) {
-      rhs_shared[n_reg + distribute_(tid_x, tid_y, 1, N_TILE_SM)] = rhs[n_reg + tiling_(k, bid_x, K_TILE_SM, N_TILE_SM, N, 1) + distribute_(tid_x, tid_y, 1, N)];
+    for (int nreg = 0; nreg < N_TILE_REG; nreg++) {
+      rhs_shared[distribute_(tid_x*N_TILE_REG + nreg, tid_y, 1, N_TILE_SM)] = rhs[tiling_(k, bid_x, K_TILE_SM, N_TILE_SM, N, 1) + distribute_(tid_x*N_TILE_REG + nreg, tid_y, 1, N)];
     }
     __syncthreads();
 
     // contract at 128x128x32 micro-kernel
-    matmul_kernel_128x128x32_perthread_4x4(lhs_shared, rhs_shared, partial_sum);
-    __syncthreads();
-
-    // store to smem
-    for (int m_reg = 0; m_reg < M_TILE_REG; m_reg++)
-      for (int n_reg = 0; n_reg < N_TILE_REG; n_reg++)
-        output_shared[distribute_(tid_x * N_TILE_REG, tid_y * M_TILE_REG, 1, N_TILE_SM) + distribute_(m_reg, n_reg, N_TILE_SM, 1)] = alpha * partial_sum[m_reg * 4 + n_reg];
-
-    // store to gmem
-    for (int m_reg = 0; m_reg < M_TILE_REG; m_reg++)
-      for (int n_reg = 0; n_reg < N_TILE_REG; n_reg++)
-    output[tiling_(bid_y, bid_x, M_TILE_SM, N_TILE_SM, N, 1) + distribute_(tid_x*N_TILE_REG, tid_y*M_TILE_REG, 1, N) + distribute_(m_reg, n_reg, N, 1)] = output_shared[distribute_(tid_x*N_TILE_REG, tid_y*M_TILE_REG, 1, N_TILE_SM) + distribute_(m_reg, n_reg, N_TILE_SM, 1)];
+    matmul_kernel_64x64x32_perthread_2x2(lhs_shared, rhs_shared, partial_sum);
+    // more syncs
+    // local => gmem 4930 GF
+    // local => smem, smem => gmem 5255 GF
+    // __syncthreads();
+  }
+  // local => smem, smem => gmem 5485 GF
+  // local => gmem error in results
+  __syncthreads();
+  
+  for (int mreg = 0; mreg < M_TILE_REG; mreg++) {
+    for (int nreg = 0; nreg < N_TILE_REG; nreg++) {
+      out_shared[distribute_(tid_x * N_TILE_REG, tid_y * M_TILE_REG, 1, N_TILE_SM) + distribute_(mreg, nreg, N_TILE_SM, 1)] = alpha * partial_sum[mreg * 4 + nreg];
+      out[tiling_(bid_y, bid_x, M_TILE_SM, N_TILE_SM, N, 1) + distribute_(tid_x*N_TILE_REG, tid_y*M_TILE_REG, 1, N) + distribute_(mreg, nreg, N, 1)] = out_shared[distribute_(tid_x*N_TILE_REG, tid_y*M_TILE_REG, 1, N_TILE_SM) + distribute_(mreg, nreg, N_TILE_SM, 1)];
+      // out[tiling_(bid_y, bid_x, M_TILE_SM, N_TILE_SM, N, 1) + distribute_(tid_x*N_TILE_REG, tid_y*M_TILE_REG, 1, N) + distribute_(mreg, nreg, N, 1)] = alpha * partial_sum[mreg * N_TILE_REG + nreg]; 
+    }
   }
 }
 
@@ -144,14 +153,14 @@ void catzilla_matmul_v2(int M, int N, int K, float alpha, float *A,
                                   float *B, float beta, float *C) {
   const int M_TILE = 64;
   const int N_TILE = 64;
-  const int M_REG = 4;
-  const int N_REG = 4;
+  const int mreg = 2;
+  const int nreg = 2;
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
-  dim3 blockDim(CEIL_DIV(M_TILE, M_REG), CEIL_DIV(N_TILE, N_REG));
-  cudaFuncSetAttribute(_catzilla_matmul_v2<M_TILE, N_TILE, 32, M_REG, N_REG>,
+  dim3 blockDim(CEIL_DIV(M_TILE, mreg), CEIL_DIV(N_TILE, nreg));
+  cudaFuncSetAttribute(_catzilla_matmul_v2<M_TILE, N_TILE, 32, mreg, nreg>,
                        cudaFuncAttributePreferredSharedMemoryCarveout,
                        cudaSharedmemCarveoutMaxShared);
-  _catzilla_matmul_v2<M_TILE, N_TILE, 32, M_REG, N_REG><<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+  _catzilla_matmul_v2<M_TILE, N_TILE, 32, mreg, nreg><<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -165,7 +174,7 @@ void catzilla_matmul_v2(int M, int N, int K, float alpha, float *A,
 template <const int M_TILE_SM, const int N_TILE_SM, const int K_TILE_SM, const int M_TILE_REG, const int N_TILE_REG>
 __global__ void _catzilla_matmul_v3(int M, int N, int K, float alpha,
                                        float *lhs, float *rhs,
-                                       float beta, float *output) {
+                                       float beta, float *out) {
   int bid_x = blockIdx.x;
   int bid_y = blockIdx.y;
 
@@ -176,11 +185,11 @@ __global__ void _catzilla_matmul_v3(int M, int N, int K, float alpha,
   // M=128, N=128, K=32, Mreg=4, Nreg=4
   __shared__ float lhs_shared[M_TILE_SM * K_TILE_SM];
   __shared__ float rhs_shared[K_TILE_SM * N_TILE_SM];
-  __shared__ float output_shared[M_TILE_SM * N_TILE_SM];
-  // __shared__ float output_shared[1];
+  __shared__ float out_shared[M_TILE_SM * N_TILE_SM];
+  // __shared__ float out_shared[1];
 
-  // init output
-  // output_shared[distribute_(tid_x, tid_y, 1, N_TILE_SM)] = 0.0;
+  // init out
+  // out_shared[distribute_(tid_x, tid_y, 1, N_TILE_SM)] = 0.0;
 
   float partial_sum[M_TILE_REG * N_TILE_REG] = {0.};
 
@@ -190,28 +199,27 @@ __global__ void _catzilla_matmul_v3(int M, int N, int K, float alpha,
   for (int k = 0; k < CEIL_DIV(K, K_TILE_SM); k++) { // range(0, 128, 1)
     // use distribute_ for in-tile thread calculation
     // use tile_ for out-tile thread calculation
-    // newlhs += tiling_(0, 1, M_TILE_SM, K_TILE_SM, K, 1);
-    for (int m_reg = 0; m_reg < M_TILE_REG; m_reg++) {
-      lhs_shared[m_reg*K_TILE_SM + distribute_(tid_x, tid_y, 1, K_TILE_SM)] = lhs[m_reg*K + tiling_(bid_y, k, M_TILE_SM, K_TILE_SM, K, 1) + distribute_(tid_x, tid_y, 1, K)];
+    float* lhs_cursor = lhs + tiling_(bid_y, k, M_TILE_SM, K_TILE_SM, K, 1);
+    float* rhs_cursor = rhs + tiling_(k, bid_x, K_TILE_SM, N_TILE_SM, N, 1);
+    for (int mreg = 0; mreg < M_TILE_REG; mreg++) {
+      lhs_shared[distribute_(tid_x, tid_y*M_TILE_REG + mreg, 1, K_TILE_SM)] = lhs_cursor[distribute_(tid_x, tid_y*M_TILE_REG + mreg, 1, K)];
     }
-    for (int n_reg = 0; n_reg < N_TILE_REG; n_reg++) {
-      rhs_shared[n_reg + distribute_(tid_x, tid_y, 1, N_TILE_SM)] = rhs[n_reg + tiling_(k, bid_x, K_TILE_SM, N_TILE_SM, N, 1) + distribute_(tid_x, tid_y, 1, N)];
+    for (int nreg = 0; nreg < N_TILE_REG; nreg++) {
+      rhs_shared[distribute_(tid_x*N_TILE_REG + nreg, tid_y, 1, N_TILE_SM)] = rhs_cursor[distribute_(tid_x*N_TILE_REG + nreg, tid_y, 1, N)];
     }
     __syncthreads();
 
     // contract at 128x128x32 micro-kernel
-    matmul_kernel_128x128x32_perthread_4x4(lhs_shared, rhs_shared, partial_sum);
-    __syncthreads();
-
-    // store to smem
-    for (int m_reg = 0; m_reg < M_TILE_REG; m_reg++)
-      for (int n_reg = 0; n_reg < N_TILE_REG; n_reg++)
-        output_shared[distribute_(tid_x * N_TILE_REG, tid_y * M_TILE_REG, 1, N_TILE_SM) + distribute_(m_reg, n_reg, N_TILE_SM, 1)] = alpha * partial_sum[m_reg * 4 + n_reg];
-
-    // store to gmem
-    for (int m_reg = 0; m_reg < M_TILE_REG; m_reg++)
-      for (int n_reg = 0; n_reg < N_TILE_REG; n_reg++)
-    output[tiling_(bid_y, bid_x, M_TILE_SM, N_TILE_SM, N, 1) + distribute_(tid_x*N_TILE_REG, tid_y*M_TILE_REG, 1, N) + distribute_(m_reg, n_reg, N, 1)] = output_shared[distribute_(tid_x*N_TILE_REG, tid_y*M_TILE_REG, 1, N_TILE_SM) + distribute_(m_reg, n_reg, N_TILE_SM, 1)];
+    matmul_kernel_64x64x32_perthread_2x2(lhs_shared, rhs_shared, partial_sum);
+  }
+  __syncthreads();
+  
+  float* out_cursor = out + tiling_(bid_y, bid_x, M_TILE_SM, N_TILE_SM, N, 1);
+  for (int mreg = 0; mreg < M_TILE_REG; mreg++) {
+    for (int nreg = 0; nreg < N_TILE_REG; nreg++) {
+      out_shared[distribute_(tid_x * N_TILE_REG + nreg, tid_y * M_TILE_REG + mreg, 1, N_TILE_SM)] = alpha * partial_sum[mreg * 4 + nreg];
+      out_cursor[distribute_(tid_x * N_TILE_REG + nreg, tid_y * M_TILE_REG + mreg, 1, N)] = out_shared[distribute_(tid_x*N_TILE_REG + nreg, tid_y*M_TILE_REG + mreg, 1, N_TILE_SM)];
+    }
   }
 }
 
@@ -220,14 +228,106 @@ void catzilla_matmul_v3(int M, int N, int K, float alpha, float *A,
                                   float *B, float beta, float *C) {
   const int M_TILE = 64;
   const int N_TILE = 64;
-  const int M_REG = 4;
-  const int N_REG = 4;
+  const int mreg = 2;
+  const int nreg = 2;
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
-  dim3 blockDim(CEIL_DIV(M_TILE, M_REG), CEIL_DIV(N_TILE, N_REG));
-  cudaFuncSetAttribute(_catzilla_matmul_v3<M_TILE, N_TILE, 32, M_REG, N_REG>,
+  dim3 blockDim(CEIL_DIV(M_TILE, mreg), CEIL_DIV(N_TILE, nreg));
+  cudaFuncSetAttribute(_catzilla_matmul_v3<M_TILE, N_TILE, 32, mreg, nreg>,
                        cudaFuncAttributePreferredSharedMemoryCarveout,
                        cudaSharedmemCarveoutMaxShared);
-  _catzilla_matmul_v3<M_TILE, N_TILE, 32, M_REG, N_REG><<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+  _catzilla_matmul_v3<M_TILE, N_TILE, 32, mreg, nreg><<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+}
+
+// simplify with stream-style
+template <const int M_TILE_SM, const int N_TILE_SM, const int K_TILE_SM, const int M_TILE_REG, const int N_TILE_REG>
+__global__ void _catzilla_matmul_v4(int M, int N, int K, float alpha,
+                                       float *lhs, float *rhs,
+                                       float beta, float *out) {
+  // TODO: hide it with RAII
+  int bid_x = blockIdx.x;
+  int bid_y = blockIdx.y;
+
+  int tid_x = threadIdx.x;
+  int tid_y = threadIdx.y;
+
+  // smem stationary
+  // M=128, N=128, K=32, Mreg=4, Nreg=4
+  __shared__ float lhs_shared[M_TILE_SM * K_TILE_SM];
+  __shared__ float rhs_shared[K_TILE_SM * N_TILE_SM];
+  __shared__ float out_shared[M_TILE_SM * N_TILE_SM];
+
+  Matrix lhs_mat = Matrix(lhs, Coord(M, K));
+  Matrix rhs_mat = Matrix(rhs, Coord(K, N));
+  Matrix out_mat = Matrix(out, Coord(M, N));
+
+  Matrix lhs_shared_mat = Matrix(lhs_shared, Coord(M_TILE_SM, K_TILE_SM));
+  Matrix rhs_shared_mat = Matrix(rhs_shared, Coord(K_TILE_SM, N_TILE_SM));
+  Matrix out_shared_mat = Matrix(out_shared, Coord(M_TILE_SM, N_TILE_SM));
+  // __shared__ float out_shared[1];
+
+  // init out
+  // out_shared[distribute_(tid_x, tid_y, 1, N_TILE_SM)] = 0.0;
+
+  float partial_sum[M_TILE_REG * N_TILE_REG] = {0.};
+
+  // distribute bid_y for lhs
+
+  // QZ: per thread m and m+1
+  for (int k = 0; k < CEIL_DIV(K, K_TILE_SM); k++) { // range(0, 128, 1)
+    // use distribute_ for in-tile thread calculation
+    // use tile_ for out-tile thread calculation
+    for (int mreg = 0; mreg < M_TILE_REG; mreg++) {
+      lhs_shared_mat
+        .distribute(Coord(tid_x, tid_y*M_TILE_REG + mreg), Coord(1, K_TILE_SM)) 
+        = lhs_mat
+        .tile(Coord(bid_y, k), Coord(M_TILE_SM, K_TILE_SM), Coord(K, 1))
+        .distribute(Coord(tid_x, tid_y*M_TILE_REG + mreg), Coord(1, K));
+    }
+    for (int nreg = 0; nreg < N_TILE_REG; nreg++) {
+      rhs_shared_mat
+        .distribute(Coord(tid_x*N_TILE_REG + nreg, tid_y), Coord(1, N_TILE_SM)) 
+        = rhs_mat
+        .tile(Coord(k, bid_x), Coord(K_TILE_SM, N_TILE_SM), Coord(N, 1))
+        .distribute(Coord(tid_x*N_TILE_REG + nreg, tid_y), Coord(1, N));
+    }
+    __syncthreads();
+
+    // contract at 128x128x32 micro-kernel
+    matmul_kernel_64x64x32_perthread_2x2(lhs_shared, rhs_shared, partial_sum);
+  }
+  __syncthreads();
+  
+  // float* out_cursor = out + tiling_(bid_y, bid_x, M_TILE_SM, N_TILE_SM, N, 1);
+  for (int mreg = 0; mreg < M_TILE_REG; mreg++) {
+    for (int nreg = 0; nreg < N_TILE_REG; nreg++) {
+      // out_cursor[distribute_(tid_x * N_TILE_REG + nreg, tid_y * M_TILE_REG + mreg, 1, N)] = out_shared[distribute_(tid_x*N_TILE_REG + nreg, tid_y*M_TILE_REG + mreg, 1, N_TILE_SM)];
+      // out_cursor.distribute(Coord(tid_x * N_TILE_REG + nreg, tid_y * M_TILE_REG + mreg), Coord(1, N)).data[0] = out_shared[distribute_(tid_x*N_TILE_REG + nreg, tid_y*M_TILE_REG + mreg, 1, N_TILE_SM)];
+      out_shared_mat
+        .tile(Coord(tid_x, tid_y), Coord(N_TILE_REG, M_TILE_REG), Coord(1, N_TILE_SM))
+        .distribute(Coord(nreg, mreg), Coord(1, N_TILE_SM)) 
+        = alpha * partial_sum[mreg * 4 + nreg];
+      out_mat
+        .tile(Coord(bid_y, bid_x), Coord(M_TILE_SM, N_TILE_SM), Coord(N, 1))
+        .distribute(Coord(tid_x * N_TILE_REG + nreg, tid_y * M_TILE_REG + mreg), Coord(1, N)) 
+        = out_shared_mat
+        .distribute(Coord(tid_x * N_TILE_REG + nreg, tid_y * M_TILE_REG + mreg), Coord(1, N_TILE_SM));
+    }
+  }
+}
+
+
+void catzilla_matmul_v4(int M, int N, int K, float alpha, float *A,
+                                  float *B, float beta, float *C) {
+  const int M_TILE = 64;
+  const int N_TILE = 64;
+  const int mreg = 2;
+  const int nreg = 2;
+  dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
+  dim3 blockDim(CEIL_DIV(M_TILE, mreg), CEIL_DIV(N_TILE, nreg));
+  cudaFuncSetAttribute(_catzilla_matmul_v4<M_TILE, N_TILE, 32, mreg, nreg>,
+                       cudaFuncAttributePreferredSharedMemoryCarveout,
+                       cudaSharedmemCarveoutMaxShared);
+  _catzilla_matmul_v3<M_TILE, N_TILE, 32, mreg, nreg><<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
 #endif // CATZILLA_RECIPES_KERNELS_MATMUL_V1_H_

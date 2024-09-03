@@ -50,7 +50,7 @@ void CudaDeviceInfo() {
          props.multiProcessorCount, props.warpSize);
 };
 
-void randomize_matrix(float *mat, int N) {
+void randomise(float *mat, int N) {
   // NOTICE: Use gettimeofday instead of srand((unsigned)time(NULL)); the time
   // precision is too low and the same random number is generated.
   struct timeval time {};
@@ -63,15 +63,22 @@ void randomize_matrix(float *mat, int N) {
   }
 }
 
-void range_init_matrix(float *mat, int N) {
+void ranges(float *mat, int N) {
+  int MOD = 16;
   for (int i = 0; i < N; i++) {
-    mat[i] = i;
+    mat[i] = i % MOD;
   }
 }
 
-void zero_init_matrix(float *mat, int N) {
+void zeros(float *mat, int N) {
   for (int i = 0; i < N; i++) {
     mat[i] = 0.0;
+  }
+}
+
+void ones(float *mat, int N) {
+  for (int i = 0; i < N; i++) {
+    mat[i] = 1.0;
   }
 }
 

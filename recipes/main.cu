@@ -98,9 +98,11 @@ int main(int argc, char **argv) {
   C = (float *)malloc(sizeof(float) * M * N);
   C_ref = (float *)malloc(sizeof(float) * M * N);
 
-  randomize_matrix(A, M * K);
-  randomize_matrix(B, K * N);
-  randomize_matrix(C, M * N);
+  randomise(A, M * K);
+  randomise(B, K * N);
+
+  // ranges(A, M * K);
+  // ranges(B, K * N);
 
   cudaCheck(cudaMalloc((void **)&dA, sizeof(float) * M * K));
   cudaCheck(cudaMalloc((void **)&dB, sizeof(float) * K * N));
