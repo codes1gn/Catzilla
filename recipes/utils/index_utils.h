@@ -59,61 +59,79 @@ struct Coord {
   
 };
 
+// keep in mind, always row major
 struct Matrix {
   float* data;
-  Coord size;
-  bool row_major;
+  Coord shape;
+  Coord stride;
 
-  __device__ Matrix(float* data, Coord size, bool is_row_major=true) : 
+  __device__ Matrix(float* data, Coord shape) : 
     data(data), 
-    size(size), 
-    row_major(is_row_major) {}
+    shape(shape),
+    stride(Coord(shape.y, 1)){
+  }
+
+
+  __device__ Matrix(float* data, Coord shape, Coord stride) : 
+    data(data), 
+    shape(shape),
+    stride(stride) {}
+
+  __device__ Matrix(const Matrix& other) : data(other.data), shape(other.shape), stride(other.stride) {}
+
+  __device__ Matrix(Matrix&& other) noexcept : data(other.data), shape(other.shape), stride(other.stride) {
+    other.data = nullptr;
+  }
+
+  __device__ Matrix inc(int value) {
+    data += value;
+    return *this;
+  }
 
   __device__ Matrix distribute(Coord id, Coord stride) {
-    data += id.x * stride.x + id.y * stride.y;
-    return *this;
+    Matrix ret = Matrix(data + id.x * stride.x + id.y * stride.y, shape);
+    return std::move(ret);
   }
 
   __device__ Matrix tile(Coord id, Coord from_stride, Coord to_stride) {
-    data += id.x * from_stride.x * to_stride.x + id.y * from_stride.y * to_stride.y;
-    return *this;
+    Matrix ret = Matrix(data + id.x * from_stride.x * to_stride.x + id.y * from_stride.y * to_stride.y, shape);
+    return std::move(ret);
   }
 
-  __device__ Matrix& operator=(const Matrix& other) {
-    data[0] = other.data[0];
+  __device__ Matrix tile_ex(Coord tile_var, Coord other_shape) {
+    Matrix ret = Matrix(data + tile_var.x * other_shape.x * stride.x + tile_var.y * other_shape.y * stride.y, other_shape, stride);
+    return std::move(ret);
   }
 
-  __device__ Matrix& operator=(const float other_scalar) {
-    data[0] = other_scalar;
+  __device__ Matrix dist_ex(Coord tile_var) {
+    Matrix ret = Matrix(data + tile_var.x * stride.x + tile_var.y * stride.y, shape, stride);
+    return std::move(ret);
   }
 
-  __device__ bool is_row_major() {
-    return row_major;
+  __device__ void operator=(const Matrix& other) {
+    *data = *(other.data);
   }
 
-  __device__ bool is_col_major() {
-    return !row_major;
+  __device__ void operator=(const float other_scalar) {
+    *data = other_scalar;
   }
 
   __device__ void print() const {
-    if (row_major) {
-      for (size_t i = 0; i < size.x; ++i) {
-        for (size_t j = 0; j < size.y; ++j) {
-          std::cout << data[i * size.x + j * size.y] << " ";
-        }
-        std::cout << "\n";
+    for (size_t i = 0; i < shape.x; ++i) {
+      for (size_t j = 0; j < shape.y; ++j) {
+        std::cout << data[i * shape.x + j * shape.y] << " ";
       }
-    }
-    else {
-      for (size_t j = 0; j < size.y; ++j) {
-        for (size_t i = 0; i < size.x; ++i) {
-          std::cout << data[i * size.x + j * size.y] << " ";
-        }
-        std::cout << "\n";
-      }
+      std::cout << "\n";
     }
     std::cout << std::endl;
   }
 };
+
+// helper for shared decl
+__device__ Matrix& make_shared(Coord shape) {
+  __shared__ float _data[shape.x * shape.y];
+  data = std::move(_data);
+  return Matrix(std::move(_data), shape)
+}
 
 #endif // CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
