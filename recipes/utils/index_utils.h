@@ -31,6 +31,7 @@ inline __device__ int tiling_(int tile_id_x, int tile_id_y, int to_stride_x, int
 }
 
 
+// template<int X, int Y>
 struct Coord {
   int x;
   int y;
@@ -88,24 +89,29 @@ struct Matrix {
     return *this;
   }
 
-  __device__ Matrix distribute(Coord id, Coord stride) {
+  inline __device__ Matrix distribute(Coord id, Coord stride) {
     Matrix ret = Matrix(data + id.x * stride.x + id.y * stride.y, shape);
     return std::move(ret);
   }
 
-  __device__ Matrix tile(Coord id, Coord from_stride, Coord to_stride) {
+  inline __device__ Matrix tile(Coord id, Coord from_stride, Coord to_stride) {
     Matrix ret = Matrix(data + id.x * from_stride.x * to_stride.x + id.y * from_stride.y * to_stride.y, shape);
     return std::move(ret);
   }
 
-  __device__ Matrix tile_ex(Coord tile_var, Coord other_shape) {
+  inline __device__ Matrix tile_ex(Coord tile_var, Coord other_shape) {
     Matrix ret = Matrix(data + tile_var.x * other_shape.x * stride.x + tile_var.y * other_shape.y * stride.y, other_shape, stride);
     return std::move(ret);
   }
 
-  __device__ Matrix dist_ex(Coord tile_var) {
+  inline __device__ Matrix dist_ex(Coord tile_var) {
     Matrix ret = Matrix(data + tile_var.x * stride.x + tile_var.y * stride.y, shape, stride);
     return std::move(ret);
+  }
+
+  inline __device__ Matrix& dist_nocopy(Coord tile_var) {
+    data += tile_var.x * stride.x + tile_var.y * stride.y;
+    return *this;
   }
 
   __device__ void operator=(const Matrix& other) {
@@ -128,10 +134,30 @@ struct Matrix {
 };
 
 // helper for shared decl
-__device__ Matrix& make_shared(Coord shape) {
-  __shared__ float _data[shape.x * shape.y];
-  data = std::move(_data);
-  return Matrix(std::move(_data), shape)
+// template<Coord shape>
+template<int x, int y>
+__device__ Matrix make_shared() {
+  __shared__ float _data[x*y];
+  // extern __shared__ float _data[];
+  return Matrix(_data, Coord(x, y));
 }
+
+template<int x, int y>
+__device__ Matrix make_local() {
+  float _data[x*y] = {0.};
+  // extern __shared__ float _data[];
+  return Matrix(_data, Coord(x, y));
+}
+
+__device__ Coord&& make_coord(int x, int y) {
+  return std::move(Coord(x, y));
+}
+
+// TODO: consider use std::integral_constant to make Coord known at compile-time
+// template<Coord shape>
+// __device__ Matrix make_shared() {
+//   __shared__ float _data[shape.x * shape.y];
+//   return Matrix(_data, shape);
+// }
 
 #endif // CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_

@@ -69,7 +69,7 @@ debug:
 	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug .. \
 		-DCUDA_COMPUTE_CAPABILITY=$(CUDA_COMPUTE_CAPABILITY) \
 		-DCMAKE_CUDA_COMPILER=nvcc \
-		-DCMAKE_CUDA_FLAGS="-maxrregcount=128 --ptxas-options=-v --expt-relaxed-constexpr" \
+		-DCMAKE_CUDA_FLAGS="-maxrregcount=64 --ptxas-options=-v --expt-relaxed-constexpr" \
 		-GNinja
 	@ninja -C $(BUILD_DIR)
 
@@ -98,7 +98,7 @@ analysis:
 		$(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).details && \
 		vim $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).details
 
-bench: build
+bench:
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 100 -warmup 10
 
 ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)catzilla-kernel-$(KERNEL).ncu-rep),)
