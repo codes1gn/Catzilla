@@ -52,8 +52,6 @@ __global__ void sgemm2DBlocktiling(int M, int N, int K, float alpha, float *A,
 
   float tmp[TM][TN] = {
       0.}; // 每个线程负责TM*TN个元素，则需要申请TM*TN个寄存器保存累加值，额外的一个寄存器用于缓存；
-  float a_frag[TM] = {0.};
-  float b_frag[TN] = {0.};
 
 #pragma unroll
   for (int k = 0; k < K; k += BK) {
@@ -95,5 +93,34 @@ __global__ void sgemm2DBlocktiling(int M, int N, int K, float alpha, float *A,
     for (int l = 0; l < TN; l++)
       C[(ty + j) * N + tx + l] =
           alpha * tmp[j][l] + beta * C[(ty + j) * N + tx + l];
+  }
+}
+
+void runSgemm2DBlocktiling(int M, int N, int K, float alpha, float *A, float *B,
+                           float beta, float *C) {
+  const uint BK = 16;
+  const uint TM = 8;
+  const uint TN = 8;
+  printf("hello");
+  if (M >= 128 and N >= 128) {
+    const uint BM = 128;
+    const uint BN = 128;
+    const uint M_THREAD = CEIL_DIV(BM, TM); // 16
+    const uint N_THREAD = CEIL_DIV(BN, TN); // 16
+    dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
+    dim3 blockDim(M_THREAD, N_THREAD);
+    sgemm2DBlocktiling<BM, BN, BK, TM, TN>
+        <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+  } else {
+    // this is a hacky solution to the underlying problem
+    // of not having proper bounds checking in the kernel
+    const uint BM = 64;
+    const uint BN = 64;
+    const uint M_THREAD = CEIL_DIV(BM, TM); // 16
+    const uint N_THREAD = CEIL_DIV(BN, TN); // 16
+    dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
+    dim3 blockDim(M_THREAD, N_THREAD);
+    sgemm2DBlocktiling<BM, BN, BK, TM, TN>
+        <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
   }
 }

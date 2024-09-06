@@ -32,6 +32,7 @@ inline __device__ int tiling_(int tile_id_x, int tile_id_y, int to_stride_x, int
 
 
 // template<int X, int Y>
+// TODO: rename to row, col, not x, y
 struct Coord {
   int x;
   int y;
@@ -55,6 +56,22 @@ struct Coord {
     auto x_swz = x16_swz * 16 / sizeof(float) % 32 + x % (16 / sizeof(float));
     x = x_swz % 32;
     y = x_swz / 32;
+    return *this;
+  }
+
+  __device__ Coord& xor_swizzle_col() {
+    auto i = (x*16 + y);
+    auto i_swz = (x*16 + y) ^ x;
+    y = i_swz % 16;
+    x = i_swz / 16;
+    return *this;
+  }
+
+  __device__ Coord& xor_swizzle_row() {
+    auto i = (x*16 + y);
+    auto i_swz = (x*16 + y) ^ y;
+    y = i_swz % 16;
+    x = i_swz / 16;
     return *this;
   }
   
@@ -159,5 +176,9 @@ __device__ Coord&& make_coord(int x, int y) {
 //   __shared__ float _data[shape.x * shape.y];
 //   return Matrix(_data, shape);
 // }
+__device__ __forceinline__
+int xor_swizzle(int o) {
+  return (o ^ ((o & (7 << 5)) >> 3));
+}
 
 #endif // CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_

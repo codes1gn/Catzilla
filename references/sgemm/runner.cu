@@ -181,46 +181,6 @@ void run_sgemm_shared_mem_block(int M, int N, int K, float alpha, float *A,
       <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
-void runSgemm1DBlocktiling(int M, int N, int K, float alpha, float *A, float *B,
-                           float beta, float *C) {
-  const uint BM = 64;
-  const uint BN = 64;
-  const uint BK = 8;
-  const uint TM = 8;
-  dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-  dim3 blockDim((BM * BN) / TM);
-  sgemm1DBlocktiling<BM, BN, BK, TM>
-      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-}
-
-void runSgemm2DBlocktiling(int M, int N, int K, float alpha, float *A, float *B,
-                           float beta, float *C) {
-  // const uint BK = 8;
-  const uint BK = 16;
-  const uint TM = 8;
-  const uint TN = 8;
-  if (M >= 128 and N >= 128) {
-    const uint BM = 128;
-    const uint BN = 128;
-    const uint M_THREAD = CEIL_DIV(BM, TM); // 16
-    const uint N_THREAD = CEIL_DIV(BN, TN); // 16
-    dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-    dim3 blockDim(M_THREAD, N_THREAD);
-    sgemm2DBlocktiling<BM, BN, BK, TM, TN>
-        <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-  } else {
-    // this is a hacky solution to the underlying problem
-    // of not having proper bounds checking in the kernel
-    const uint BM = 64;
-    const uint BN = 64;
-    const uint M_THREAD = CEIL_DIV(BM, TM); // 16
-    const uint N_THREAD = CEIL_DIV(BN, TN); // 16
-    dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-    dim3 blockDim(M_THREAD, N_THREAD);
-    sgemm2DBlocktiling<BM, BN, BK, TM, TN>
-        <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-  }
-}
 
 void runSgemmVectorize(int M, int N, int K, float alpha, float *A, float *B,
                        float beta, float *C) {

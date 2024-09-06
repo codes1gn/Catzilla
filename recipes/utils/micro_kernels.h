@@ -6,6 +6,8 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
+#include "index_utils.h"
+
 // TODO: move
 inline __device__ void matmul_kernel_32x32x32(float *lhs, float *rhs,
                                               float &out) {
@@ -90,16 +92,50 @@ inline __device__ void matmul_kernel_scalar(float *lhs, float *rhs,
   return;
 }
 
-template <const int M, const int N, const int K, const int M_TH, const int N_TH>
+template <const int M, const int N, const int K, const int THD_Y, const int THD_X>
 inline __device__ void matmul_kernel_coalesced(float *lhs, float *rhs,
                                                float *out) {
   for (int k = 0; k < K; k++)
-#pragma unroll
-    for (int m = 0; m < CEIL_DIV(M, M_TH); m++)
-      for (int n = 0; n < CEIL_DIV(N, N_TH); n++)
-        out[m * CEIL_DIV(N, N_TH) + n] +=
-            lhs[m * M_TH * K + threadIdx.y * K + k] *
-            rhs[k * N + N_TH * n + threadIdx.x];
+    #pragma unroll
+    for (int m = 0; m < CEIL_DIV(M, THD_Y); m++)
+      #pragma unroll
+      for (int n = 0; n < CEIL_DIV(N, THD_X); n++)
+        out[m * CEIL_DIV(N, THD_X) + n] +=
+            lhs[m * THD_Y * K + threadIdx.y * K + k] *
+            rhs[k * N + THD_X * n + threadIdx.x];
+  __syncthreads();
+  return;
+}
+
+template <const int M, const int N, const int K, const int THD_Y, const int THD_X>
+inline __device__ void matmul_kernel_xor_swizzled(float *lhs, float *rhs,
+                                               float *out) {
+  // int x_swz = xor_swizzle(threadIdx.x);
+  // int x_swz = threadIdx.x;
+  for (int k = 0; k < K; k++)
+    #pragma unroll
+    for (int m = 0; m < CEIL_DIV(M, THD_Y); m++)
+      #pragma unroll
+      for (int n = 0; n < CEIL_DIV(N, THD_X); n++)
+        out[m * CEIL_DIV(N, THD_X) + n] +=
+            lhs[m * THD_Y * K + threadIdx.y * K + k] *
+            rhs[k * N + THD_X * n + x_swz];
+  __syncthreads();
+  return;
+}
+
+
+template <const int M, const int N, const int K, const int THD_Y, const int THD_X>
+inline __device__ void matmul_kernel_pad_swizzled(float *lhs, float *rhs,
+                                               float *out) {
+  for (int k = 0; k < K; k++)
+    #pragma unroll
+    for (int m = 0; m < CEIL_DIV(M, THD_Y); m++)
+      #pragma unroll
+      for (int n = 0; n < CEIL_DIV(N, THD_X); n++)
+        out[m * CEIL_DIV(N, THD_X) + n] +=
+            lhs[m * THD_Y * (K+1) + threadIdx.y * (K+1) + k] *
+            rhs[k * (N+1) + THD_X * n + threadIdx.x];
   __syncthreads();
   return;
 }
