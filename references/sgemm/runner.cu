@@ -195,14 +195,17 @@ void runSgemm1DBlocktiling(int M, int N, int K, float alpha, float *A, float *B,
 
 void runSgemm2DBlocktiling(int M, int N, int K, float alpha, float *A, float *B,
                            float beta, float *C) {
-  const uint BK = 8;
+  // const uint BK = 8;
+  const uint BK = 16;
   const uint TM = 8;
   const uint TN = 8;
   if (M >= 128 and N >= 128) {
     const uint BM = 128;
     const uint BN = 128;
+    const uint M_THREAD = CEIL_DIV(BM, TM); // 16
+    const uint N_THREAD = CEIL_DIV(BN, TN); // 16
     dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-    dim3 blockDim((BM * BN) / (TM * TN));
+    dim3 blockDim(M_THREAD, N_THREAD);
     sgemm2DBlocktiling<BM, BN, BK, TM, TN>
         <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
   } else {
@@ -210,8 +213,10 @@ void runSgemm2DBlocktiling(int M, int N, int K, float alpha, float *A, float *B,
     // of not having proper bounds checking in the kernel
     const uint BM = 64;
     const uint BN = 64;
+    const uint M_THREAD = CEIL_DIV(BM, TM); // 16
+    const uint N_THREAD = CEIL_DIV(BN, TN); // 16
     dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-    dim3 blockDim((BM * BN) / (TM * TN));
+    dim3 blockDim(M_THREAD, N_THREAD);
     sgemm2DBlocktiling<BM, BN, BK, TM, TN>
         <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
   }
@@ -242,7 +247,7 @@ void runSgemmVectorize(int M, int N, int K, float alpha, float *A, float *B,
 }
 
 void runSgemmDoublebuffer(int M, int N, int K, float alpha, float *A, float *B,
-                       float beta, float *C) {
+                          float beta, float *C) {
   const uint BK = 8;
   const uint TM = 8;
   const uint TN = 8;
@@ -271,24 +276,21 @@ void runSgemmHardcoded(int M, int N, int K, float alpha, float *A, float *B,
   // subm, subn, subk
   dim3 block(256);
   dim3 grid((M + BLOCK_DIM - 1) / BLOCK_DIM, (N + BLOCK_DIM - 1) / BLOCK_DIM);
-  gemm_kernel_NN<<<grid, block>>>(A, B, (float4*)C, alpha, beta, M, N,
-                                    K);
+  gemm_kernel_NN<<<grid, block>>>(A, B, (float4 *)C, alpha, beta, M, N, K);
 }
 
 void runSgemm11(int M, int N, int K, float alpha, float *A, float *B,
-                       float beta, float *C) {
+                float beta, float *C) {
   dim3 blockDim(256);
-  dim3 gridDim(CEIL_DIV(M,128),CEIL_DIV(N,128));
-  sgemm_12<<<gridDim, blockDim>>>(A, B, C, alpha, beta, M, N,
-                                    K);
+  dim3 gridDim(CEIL_DIV(M, 128), CEIL_DIV(N, 128));
+  sgemm_12<<<gridDim, blockDim>>>(A, B, C, alpha, beta, M, N, K);
 }
 
 void runSgemm12(int M, int N, int K, float alpha, float *A, float *B,
-                       float beta, float *C) {
+                float beta, float *C) {
   dim3 blockDim(256);
-  dim3 gridDim(CEIL_DIV(M,128),CEIL_DIV(N,128));
-  sgemm_12<<<gridDim, blockDim>>>(A, B, C, alpha, beta, M, N,
-                                    K);
+  dim3 gridDim(CEIL_DIV(M, 128), CEIL_DIV(N, 128));
+  sgemm_12<<<gridDim, blockDim>>>(A, B, C, alpha, beta, M, N, K);
 }
 
 void runSgemmAutotuned(int M, int N, int K, float alpha, float *A, float *B,
@@ -393,7 +395,6 @@ void runSgemmWarptiling(int M, int N, int K, float alpha, float *A, float *B,
                   K10_TN, K10_NUM_THREADS>
       <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
-
 
 void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
                 float *B, float beta, float *C, cublasHandle_t handle) {

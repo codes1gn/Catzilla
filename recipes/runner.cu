@@ -158,7 +158,6 @@ void runCublasTF32(cublasHandle_t handle, int M, int N, int K, float alpha,
                CUBLAS_COMPUTE_32F_FAST_TF32, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
 }
 
-
 // TODO: omit this wrapper
 void run_kernel(int kernel_num, int M, int N, int K, float alpha, float *A,
                 float *B, float beta, float *C, cublasHandle_t handle) {
