@@ -110,7 +110,7 @@ inline __device__ void matmul_kernel_coalesced(float *lhs, float *rhs,
 template <const int M, const int N, const int K, const int THD_Y, const int THD_X>
 inline __device__ void matmul_kernel_xor_swizzled(float *lhs, float *rhs,
                                                float *out) {
-  // int x_swz = xor_swizzle(threadIdx.x);
+  int x_swz = xor_swizzle(threadIdx.x);
   // int x_swz = threadIdx.x;
   for (int k = 0; k < K; k++)
     #pragma unroll

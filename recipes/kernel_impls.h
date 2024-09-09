@@ -26,6 +26,9 @@ inline void catzilla_matmul_exec(int impl_idx, int M, int N, int K, float alpha,
   } else if (impl_idx == 7) {
     // stream-style tiling -> distribute
     catzilla_matmul_v7(M, N, K, alpha, A, B, beta, C);
+  } else if (impl_idx == 8) {
+    // stream-style tiling -> distribute
+    catzilla_matmul_v8(M, N, K, alpha, A, B, beta, C);
   }
 }
 
