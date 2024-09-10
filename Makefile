@@ -104,6 +104,19 @@ bench: build
 dev: build
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 16 -size-n 16 -size-k 16
 
+format:
+	@cd $(BUILD_DIR) && ninja format-code
+
+# Define the git target, which depends on format
+git: format
+	@changed_files=$$(git status --porcelain | grep 'M' | awk '{print $$2}'); \
+		if [ -n "$$changed_files" ]; then \
+			echo "Adding changed files to git..."; \
+    	git add $$changed_files; \
+    else \
+    	echo "No changes detected."; \
+    fi
+
 ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)catzilla-kernel-$(KERNEL).ncu-rep),)
     FILE_EXISTS := 1
 else

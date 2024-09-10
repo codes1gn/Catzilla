@@ -1,35 +1,41 @@
 #ifndef CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
 #define CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
 
-#include <tuple>
-#include <iostream>
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
-
+#include <iostream>
+#include <tuple>
 
 // convert multi-dim index to flatten-index
 // make it stream-style coding
 //
 // legacy:
-// output[tiling_(bid_y, bid_x, M_TILE_SM, N_TILE_SM, N, 1) + distribute_(tid_x*N_TILE_REG, tid_y*M_TILE_REG, 1, N) + distribute_(m_reg, n_reg, N, 1)]
+// output[tiling_(bid_y, bid_x, M_TILE_SM, N_TILE_SM, N, 1) +
+// distribute_(tid_x*N_TILE_REG, tid_y*M_TILE_REG, 1, N) + distribute_(m_reg,
+// n_reg, N, 1)]
 //
 // novel:
 // lhs.tiling_(xxx).distribute_(xx)
 // rhs.tiling_(xxx).tiling_(xxx).distribute_(xx)
-inline __device__ int distribute_(int x_offset, int y_offset, int x_stride, int y_stride) {
+inline __device__ int distribute_(int x_offset, int y_offset, int x_stride,
+                                  int y_stride)
+{
   int idx = x_offset * x_stride + y_offset * y_stride;
   return idx;
 }
 
 // convert multi-dim index of a tile-block to flatten-index
-inline __device__ int tiling_(int tile_id_x, int tile_id_y, int to_stride_x, int to_stride_y, int from_stride_x, int from_stride_y) {
-  int idx = tile_id_x * to_stride_x * from_stride_x + tile_id_y * to_stride_y * from_stride_y;
+inline __device__ int tiling_(int tile_id_x, int tile_id_y, int to_stride_x,
+                              int to_stride_y, int from_stride_x,
+                              int from_stride_y)
+{
+  int idx = tile_id_x * to_stride_x * from_stride_x
+            + tile_id_y * to_stride_y * from_stride_y;
   return idx;
 }
-
 
 // template<int X, int Y>
 // TODO: rename to row, col, not x, y
@@ -38,18 +44,28 @@ struct Coord {
   int y;
 
   // 构造函数
-  __device__ Coord(int x, int y) : x(x), y(y) {}
+  __device__ Coord(int x, int y)
+      : x(x)
+      , y(y)
+  {
+  }
 
   // 从 std::tuple<int, int> 构造
-  __device__ Coord(const std::tuple<int, int>& t) : x(std::get<0>(t)), y(std::get<1>(t)) {}
+  __device__ Coord(const std::tuple<int, int> &t)
+      : x(std::get<0>(t))
+      , y(std::get<1>(t))
+  {
+  }
 
   // 将 Coord 转换为 std::tuple<int, int>
-  __device__ std::tuple<int, int> to_tuple() const {
+  __device__ std::tuple<int, int> to_tuple() const
+  {
     return std::make_tuple(x, y);
   }
 
-  __device__ Coord& xor_swizzle() {
-    auto i16 = (y*32 + x) * sizeof(float) / 16;
+  __device__ Coord &xor_swizzle()
+  {
+    auto i16 = (y * 32 + x) * sizeof(float) / 16;
     auto y16 = i16 / 8;
     auto x16 = i16 % 8;
     auto x16_swz = y16 ^ x16;
@@ -59,79 +75,115 @@ struct Coord {
     return *this;
   }
 
-  __device__ Coord& xor_swizzle_col() {
-    auto i = (x*16 + y);
-    auto i_swz = (x*16 + y) ^ x;
+  __device__ Coord &xor_swizzle_col()
+  {
+    auto i = (x * 16 + y);
+    auto i_swz = (x * 16 + y) ^ x;
     y = i_swz % 16;
     x = i_swz / 16;
     return *this;
   }
 
-  __device__ Coord& xor_swizzle_row() {
-    auto i = (x*16 + y);
-    auto i_swz = (x*16 + y) ^ y;
+  __device__ Coord &xor_swizzle_row()
+  {
+    auto i = (x * 16 + y);
+    auto i_swz = (x * 16 + y) ^ y;
     y = i_swz % 16;
     x = i_swz / 16;
     return *this;
   }
-  
 };
 
 // keep in mind, always row major
 struct Matrix {
-  float* data;
+  float *data;
   Coord shape;
   Coord stride;
 
-  __device__ Matrix(float* data, Coord shape) : 
-    data(data), 
-    shape(shape),
-    stride(Coord(shape.y, 1)){
+  __device__ Matrix(float *data, Coord shape)
+      : data(data)
+      , shape(shape)
+      , stride(Coord(shape.y, 1))
+  {
   }
 
+  __device__ Matrix(float *data, Coord shape, Coord stride)
+      : data(data)
+      , shape(shape)
+      , stride(stride)
+  {
+  }
 
-  __device__ Matrix(float* data, Coord shape, Coord stride) : 
-    data(data), 
-    shape(shape),
-    stride(stride) {}
+  __device__ Matrix(const Matrix &other)
+      : data(other.data)
+      , shape(other.shape)
+      , stride(other.stride)
+  {
+  }
 
-  __device__ Matrix(const Matrix& other) : data(other.data), shape(other.shape), stride(other.stride) {}
-
-  __device__ Matrix(Matrix&& other) noexcept : data(other.data), shape(other.shape), stride(other.stride) {
+  __device__ Matrix(Matrix &&other) noexcept
+      : data(other.data)
+      , shape(other.shape)
+      , stride(other.stride)
+  {
     other.data = nullptr;
   }
 
-  __device__ Matrix inc(int value) {
+  __device__ Matrix inc(int value)
+  {
     data += value;
     return *this;
   }
 
-  inline __device__ Matrix distribute(Coord id, Coord stride) {
+  inline __device__ Matrix distribute(Coord id, Coord stride)
+  {
     Matrix ret = Matrix(data + id.x * stride.x + id.y * stride.y, shape);
     return std::move(ret);
   }
 
-  inline __device__ Matrix tile(Coord id, Coord from_stride, Coord to_stride) {
-    Matrix ret = Matrix(data + id.x * from_stride.x * to_stride.x + id.y * from_stride.y * to_stride.y, shape);
+  inline __device__ Matrix tile(Coord id, Coord from_stride, Coord to_stride)
+  {
+    Matrix ret = Matrix(data + id.x * from_stride.x * to_stride.x
+                          + id.y * from_stride.y * to_stride.y,
+                        shape);
     return std::move(ret);
   }
 
-  inline __device__ Matrix tile_ex(Coord tile_var, Coord other_shape) {
-    Matrix ret = Matrix(data + tile_var.x * other_shape.x * stride.x + tile_var.y * other_shape.y * stride.y, other_shape, stride);
+  inline __device__ Matrix tile_ex(Coord tile_var, Coord other_shape)
+  {
+    Matrix ret = Matrix(data + tile_var.x * other_shape.x * stride.x
+                          + tile_var.y * other_shape.y * stride.y,
+                        other_shape, stride);
     return std::move(ret);
   }
 
-  inline __device__ Matrix dist_ex(Coord tile_var) {
+  inline __device__ Matrix dist_ex(Coord tile_var)
+  {
     // shape = 8 x 2
     // y in 0-4, x in 0-4
-    Matrix ret = Matrix(data + tile_var.x * stride.x + tile_var.y * stride.y, shape, stride);
+    Matrix ret = Matrix(data + tile_var.x * stride.x + tile_var.y * stride.y,
+                        shape, stride);
     return std::move(ret);
   }
 
-  inline __device__ Matrix dist_flatten(int flat_id) {
+  inline __device__ Matrix dist_flatten(int flat_id)
+  {
     int row_in_current = flat_id / shape.y;
     int col_in_current = flat_id % shape.y;
-    Matrix ret = Matrix(data + row_in_current * stride.x + col_in_current * stride.y, shape, stride);
+    Matrix ret
+      = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
+               shape, stride);
+    return std::move(ret);
+  }
+
+  inline __device__ Matrix dist_to_thread()
+  {
+    int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
+    int row_in_current = flat_id / shape.y;
+    int col_in_current = flat_id % shape.y;
+    Matrix ret
+      = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
+               shape, stride);
     return std::move(ret);
   }
 
@@ -140,15 +192,18 @@ struct Matrix {
   //   return *this;
   // }
 
-  __device__ void operator=(const Matrix& other) {
+  __device__ void operator=(const Matrix &other)
+  {
     *data = *(other.data);
   }
 
-  __device__ void operator=(const float other_scalar) {
+  __device__ void operator=(const float other_scalar)
+  {
     *data = other_scalar;
   }
 
-  __device__ void print() const {
+  __device__ void print() const
+  {
     for (size_t i = 0; i < shape.x; ++i) {
       for (size_t j = 0; j < shape.y; ++j) {
         std::cout << data[i * shape.x + j * shape.y] << " ";
@@ -161,21 +216,22 @@ struct Matrix {
 
 // helper for shared decl
 // template<Coord shape>
-template<int x, int y>
-__device__ Matrix make_shared() {
-  __shared__ float _data[x*y];
+template <int x, int y> __device__ Matrix make_shared()
+{
+  __shared__ float _data[x * y];
   // extern __shared__ float _data[];
   return Matrix(_data, Coord(x, y));
 }
 
-template<int x, int y>
-__device__ Matrix make_local() {
-  float _data[x*y] = {0.};
+template <int x, int y> __device__ Matrix make_local()
+{
+  float _data[x * y] = {0.};
   // extern __shared__ float _data[];
   return Matrix(_data, Coord(x, y));
 }
 
-__device__ Coord&& make_coord(int x, int y) {
+__device__ Coord &&make_coord(int x, int y)
+{
   return std::move(Coord(x, y));
 }
 
@@ -185,87 +241,109 @@ __device__ Coord&& make_coord(int x, int y) {
 //   __shared__ float _data[shape.x * shape.y];
 //   return Matrix(_data, shape);
 // }
-__device__ __forceinline__
-int xor_swizzle(int o) {
+__device__ __forceinline__ int xor_swizzle(int o)
+{
   return (o ^ ((o & (7 << 5)) >> 3));
 }
 
-
 struct MatrixV {
-  float4* data;
+  float4 *data;
   Coord shape;
   Coord stride;
 
-  __device__ MatrixV(float4* data, Coord shape) : 
-    data(data), 
-    shape(shape),
-    stride(Coord(shape.y, 1)){
+  __device__ MatrixV(float4 *data, Coord shape)
+      : data(data)
+      , shape(shape)
+      , stride(Coord(shape.y, 1))
+  {
   }
 
+  __device__ MatrixV(float4 *data, Coord shape, Coord stride)
+      : data(data)
+      , shape(shape)
+      , stride(stride)
+  {
+  }
 
-  __device__ MatrixV(float4* data, Coord shape, Coord stride) : 
-    data(data), 
-    shape(shape),
-    stride(stride) {}
+  __device__ MatrixV(const MatrixV &other)
+      : data(other.data)
+      , shape(other.shape)
+      , stride(other.stride)
+  {
+  }
 
-  __device__ MatrixV(const MatrixV& other) : data(other.data), shape(other.shape), stride(other.stride) {}
-
-  __device__ MatrixV(MatrixV&& other) noexcept : data(other.data), shape(other.shape), stride(other.stride) {
+  __device__ MatrixV(MatrixV &&other) noexcept
+      : data(other.data)
+      , shape(other.shape)
+      , stride(other.stride)
+  {
     other.data = nullptr;
   }
 
-  __device__ MatrixV inc(int value) {
+  __device__ MatrixV inc(int value)
+  {
     data += value;
     return *this;
   }
 
-  inline __device__ MatrixV distribute(Coord id, Coord stride) {
+  inline __device__ MatrixV distribute(Coord id, Coord stride)
+  {
     MatrixV ret = MatrixV(data + id.x * stride.x + id.y * stride.y, shape);
     return std::move(ret);
   }
 
-  inline __device__ MatrixV tile(Coord id, Coord from_stride, Coord to_stride) {
-    MatrixV ret = MatrixV(data + id.x * from_stride.x * to_stride.x + id.y * from_stride.y * to_stride.y, shape);
+  inline __device__ MatrixV tile(Coord id, Coord from_stride, Coord to_stride)
+  {
+    MatrixV ret = MatrixV(data + id.x * from_stride.x * to_stride.x
+                            + id.y * from_stride.y * to_stride.y,
+                          shape);
     return std::move(ret);
   }
 
-  inline __device__ MatrixV tile_ex(Coord tile_var, Coord other_shape) {
-    MatrixV ret = MatrixV(data + tile_var.x * other_shape.x * stride.x + tile_var.y * other_shape.y * stride.y, other_shape, stride);
+  inline __device__ MatrixV tile_ex(Coord tile_var, Coord other_shape)
+  {
+    MatrixV ret = MatrixV(data + tile_var.x * other_shape.x * stride.x
+                            + tile_var.y * other_shape.y * stride.y,
+                          other_shape, stride);
     return std::move(ret);
   }
 
-  inline __device__ MatrixV dist_ex(Coord tile_var) {
-    MatrixV ret = MatrixV(data + tile_var.x * stride.x + tile_var.y * stride.y, shape, stride);
+  inline __device__ MatrixV dist_ex(Coord tile_var)
+  {
+    MatrixV ret = MatrixV(data + tile_var.x * stride.x + tile_var.y * stride.y,
+                          shape, stride);
     return std::move(ret);
   }
 
-  inline __device__ MatrixV& dist_nocopy(Coord tile_var) {
+  inline __device__ MatrixV &dist_nocopy(Coord tile_var)
+  {
     data += tile_var.x * stride.x + tile_var.y * stride.y;
     return *this;
   }
 
-  __device__ void operator=(const MatrixV& other) {
+  __device__ void operator=(const MatrixV &other)
+  {
     *data = *(other.data);
   }
 
-  __device__ void operator=(const float4 other_scalar) {
+  __device__ void operator=(const float4 other_scalar)
+  {
     *data = other_scalar;
   }
-
 };
 
 // helper for shared decl
 // template<Coord shape>
-template<int x, int y>
-__device__ MatrixV make_shared_v() {
-  __shared__ float4 _data[x*y];
+template <int x, int y> __device__ MatrixV make_shared_v()
+{
+  __shared__ float4 _data[x * y];
   // extern __shared__ float4 _data[];
   return MatrixV(_data, Coord(x, y));
 }
 
-template<int x, int y>
-__device__ MatrixV make_local_v() {
-  float4 _data[x*y] = {0.};
+template <int x, int y> __device__ MatrixV make_local_v()
+{
+  float4 _data[x * y] = {0.};
   // extern __shared__ float4 _data[];
   return MatrixV(_data, Coord(x, y));
 }
