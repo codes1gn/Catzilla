@@ -315,6 +315,27 @@ struct MatrixV {
     return std::move(ret);
   }
 
+  inline __device__ MatrixV dist_flatten(int flat_id)
+  {
+    int row_in_current = flat_id / shape.y;
+    int col_in_current = flat_id % shape.y;
+    MatrixV ret
+      = MatrixV(data + row_in_current * stride.x + col_in_current * stride.y,
+                shape, stride);
+    return std::move(ret);
+  }
+
+  inline __device__ MatrixV dist_to_thread()
+  {
+    int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
+    int row_in_current = flat_id / shape.y;
+    int col_in_current = flat_id % shape.y;
+    MatrixV ret
+      = MatrixV(data + row_in_current * stride.x + col_in_current * stride.y,
+                shape, stride);
+    return std::move(ret);
+  }
+
   inline __device__ MatrixV &dist_nocopy(Coord tile_var)
   {
     data += tile_var.x * stride.x + tile_var.y * stride.y;

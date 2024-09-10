@@ -1,6 +1,7 @@
 #ifndef CATZILLA_RECIPES_KERNELS_MATMUL_FLATTEN_COPY_H_
 #define CATZILLA_RECIPES_KERNELS_MATMUL_FLATTEN_COPY_H_
 
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cublas_v2.h>
@@ -12,8 +13,9 @@
 
 // flatten copy
 // TODO: xor-swizzle
-template <const int M_TILE, const int N_TILE, const int K_TILE,
-          const int X_THREAD, const int Y_THREAD>
+template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
+          const int N_REG, const int K_REG, const int X_THREAD,
+          const int Y_THREAD>
 __global__ void _catzilla_matmul_flatten_copy(int M, int N, int K, float alpha,
                                               float *lhs, float *rhs,
                                               float beta, float *out)
@@ -26,8 +28,11 @@ __global__ void _catzilla_matmul_flatten_copy(int M, int N, int K, float alpha,
   auto rhs_sm_tile_shape = Coord(K_TILE, N_TILE);
   auto out_sm_tile_shape = Coord(M_TILE, N_TILE);
 
+  auto lhs_reg_tile_shape = Coord(M_REG, K_REG);
+  auto rhs_reg_tile_shape = Coord(K_REG, N_REG);
+  auto out_reg_tile_shape = Coord(M_REG, N_REG);
+
   // make sure inner block looks like this, to ensure coalescing
-  auto per_block_data_shape = Coord(Y_THREAD, X_THREAD);
 
   Matrix lhs_mat = Matrix(lhs, lhs_shape);
   Matrix rhs_mat = Matrix(rhs, rhs_shape);
@@ -44,26 +49,26 @@ __global__ void _catzilla_matmul_flatten_copy(int M, int N, int K, float alpha,
     = make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD)>();
 
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
-    for (int m = 0; m < CEIL_DIV(M_TILE, 8); m++) {
+    for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
 #pragma unroll
-      // for (int kin = 0; kin < CEIL_DIV(K_TILE, X_THREAD); kin++) {
-      for (int kin = 0; kin < CEIL_DIV(K_TILE, 2); kin++) {
+      for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
         // TODO: span_as(y * 4, x / 4)
         int x = threadIdx.y * X_THREAD + threadIdx.x;
-        lhs_shared_mat.tile_ex(Coord(m, kin), Coord(8, 2)).dist_to_thread()
+        lhs_shared_mat.tile_ex(Coord(m, kin), lhs_reg_tile_shape)
+          .dist_to_thread()
           = lhs_mat.tile_ex(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-              .tile_ex(Coord(m, kin), Coord(8, 2))
+              .tile_ex(Coord(m, kin), lhs_reg_tile_shape)
               .dist_to_thread();
       }
     }
-    for (int kin = 0; kin < CEIL_DIV(K_TILE, Y_THREAD); kin++) {
+    for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
 #pragma unroll
-      for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-        rhs_shared_mat.tile_ex(Coord(kin, n), per_block_data_shape)
-          .dist_ex(Coord(threadIdx.y, threadIdx.x))
+      for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
+        rhs_shared_mat.tile_ex(Coord(kin, n), rhs_reg_tile_shape)
+          .dist_to_thread()
           = rhs_mat.tile_ex(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
-              .tile_ex(Coord(kin, n), per_block_data_shape)
-              .dist_ex(Coord(threadIdx.y, threadIdx.x));
+              .tile_ex(Coord(kin, n), rhs_reg_tile_shape)
+              .dist_to_thread();
       }
     }
     __syncthreads();
@@ -78,8 +83,8 @@ __global__ void _catzilla_matmul_flatten_copy(int M, int N, int K, float alpha,
 #pragma unroll
     for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
       out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-        .tile_ex(Coord(m, n), per_block_data_shape)
-        .dist_ex(Coord(threadIdx.y, threadIdx.x))
+        .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
+        .dist_to_thread()
         = partial_sum.dist_ex(Coord(m, n));
     }
   }
@@ -91,32 +96,38 @@ void catzilla_matmul_flatten_copy(int M, int N, int K, float alpha, float *A,
                                   float *B, float beta, float *C)
 {
   // for bench
-  // sec 1, determine, gridDim
   // const int M_TILE = 128;
+  // const int K_TILE = 32;
   // const int N_TILE = 128;
-  // // sec 2, determine blockDim
+  // const int M_REG = 32;
+  // const int K_REG = 8;
+  // const int N_REG = 32;
   // const int X_THREAD = 16;
   // const int Y_THREAD = 16;
-  // // sec 3, K_TILE >= N_THREAD, AND M_THREAD
-  // const int K_TILE = 32;
 
   // for debug only
   const int M_TILE = 16;
+  const int K_TILE = 4;
   const int N_TILE = 16;
-  // sec 2, determine blockDim
+  const int M_REG = 8;
+  const int K_REG = 4;
+  const int N_REG = 8;
   const int X_THREAD = 4;
   const int Y_THREAD = 4;
   // sec 3, K_TILE >= N_THREAD, AND M_THREAD
-  const int K_TILE = 2;
+  assert(M_REG * K_REG > X_THREAD * Y_THREAD);
+  assert(N_REG * K_REG > X_THREAD * Y_THREAD);
 
   // K_TILE > Y_THREAD
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(X_THREAD, Y_THREAD);
   cudaFuncSetAttribute(
-    _catzilla_matmul_flatten_copy<M_TILE, N_TILE, K_TILE, X_THREAD, Y_THREAD>,
+    _catzilla_matmul_flatten_copy<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG,
+                                  X_THREAD, Y_THREAD>,
     cudaFuncAttributePreferredSharedMemoryCarveout,
     cudaSharedmemCarveoutMaxShared);
-  _catzilla_matmul_flatten_copy<M_TILE, N_TILE, K_TILE, X_THREAD, Y_THREAD>
+  _catzilla_matmul_flatten_copy<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG,
+                                X_THREAD, Y_THREAD>
     <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
