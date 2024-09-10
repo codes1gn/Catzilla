@@ -3,6 +3,8 @@
 
 
 #include "kernels/matmul.h"
+#include "kernels/matmul_flatten_copy.h"
+#include "kernels/matmul_vload_vstore.h"
 
 
 inline void catzilla_matmul_exec(int impl_idx, int M, int N, int K, float alpha, float *A,
@@ -25,10 +27,10 @@ inline void catzilla_matmul_exec(int impl_idx, int M, int N, int K, float alpha,
     catzilla_matmul_v6(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 7) {
     // stream-style tiling -> distribute
-    catzilla_matmul_v7(M, N, K, alpha, A, B, beta, C);
+    catzilla_matmul_flatten_copy(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 8) {
     // stream-style tiling -> distribute
-    catzilla_matmul_v8(M, N, K, alpha, A, B, beta, C);
+    catzilla_matmul_vload_vstore(M, N, K, alpha, A, B, beta, C);
   }
 }
 

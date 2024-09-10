@@ -107,6 +107,25 @@ inline __device__ void matmul_kernel_coalesced(float *lhs, float *rhs,
   return;
 }
 
+// template <const int M, const int N, const int K, const int THD_Y, const int THD_X>
+// inline __device__ void matmul_kernel_coalesced_v(float4 *lhs, float4 *rhs,
+//                                                float4 *out) {
+//   auto lhs_data = (float*) lhs; // M, K
+//   auto rhs_data = (float*) rhs; // K, N
+//   auto out_data = (float*) out; // M, N
+//
+//   for (int k = 0; k < K; k++)
+//     #pragma unroll
+//     for (int m = 0; m < CEIL_DIV(M, THD_Y); m++)
+//       #pragma unroll
+//       for (int n = 0; n < CEIL_DIV(N, THD_X); n++)
+//         out[m * CEIL_DIV(N, THD_X) + n] +=
+//             lhs[m * THD_Y * K + threadIdx.y * K + k] *
+//             rhs[k * N + THD_X * n + threadIdx.x];
+//   __syncthreads();
+//   return;
+// }
+
 template <const int M, const int N, const int K, const int THD_Y, const int THD_X>
 inline __device__ void matmul_kernel_xor_swizzled(float *lhs, float *rhs,
                                                float *out) {

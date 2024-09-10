@@ -98,14 +98,14 @@ int main(int argc, char **argv) {
   C = (float *)malloc(sizeof(float) * M * N);
   C_ref = (float *)malloc(sizeof(float) * M * N);
 
-  // randomise(A, M * K);
-  // randomise(B, K * N);
+  randomise(A, M * K);
+  randomise(B, K * N);
   
   // ranges(A, M * K);
   // ranges(B, K * N);
 
-  ones(A, M * K);
-  ones(B, K * N);
+  // ones(A, M * K);
+  // ones(B, K * N);
 
   cudaCheck(cudaMalloc((void **)&dA, sizeof(float) * M * K));
   cudaCheck(cudaMalloc((void **)&dB, sizeof(float) * K * N));
@@ -134,23 +134,23 @@ int main(int argc, char **argv) {
     cudaMemcpy(C, dC, sizeof(float) * M * N, cudaMemcpyDeviceToHost);
     cudaMemcpy(C_ref, dC_ref, sizeof(float) * M * N, cudaMemcpyDeviceToHost);
 
+    if (M <= 128) {
+      std::cout << " Verbose output into " << errLogFile << "\n";
+      std::ofstream fs;
+      fs.open(errLogFile);
+      fs << "A:\n";
+      print_matrix(A, M, K, fs);
+      fs << "B:\n";
+      print_matrix(B, K, N, fs);
+      fs << "C:\n";
+      print_matrix(C, M, N, fs);
+      fs << "Should:\n";
+      print_matrix(C_ref, M, N, fs);
+    }
     if (!verify_matrix(C_ref, C, M * N)) {
       std::cout << "Failed to pass the correctness verification against NVIDIA "
                    "cuBLAS."
                 << std::endl;
-      if (M <= 128) {
-        std::cout << " Logging faulty output into " << errLogFile << "\n";
-        std::ofstream fs;
-        fs.open(errLogFile);
-        fs << "A:\n";
-        print_matrix(A, M, K, fs);
-        fs << "B:\n";
-        print_matrix(B, K, N, fs);
-        fs << "C:\n";
-        print_matrix(C, M, N, fs);
-        fs << "Should:\n";
-        print_matrix(C_ref, M, N, fs);
-      }
       exit(EXIT_FAILURE);
     }
   }

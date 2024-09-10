@@ -102,7 +102,7 @@ bench: build
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 100 -warmup 10
 
 dev: build
-	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 32 -size-n 32 -size-k 32
+	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 16 -size-n 16 -size-k 16
 
 ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)catzilla-kernel-$(KERNEL).ncu-rep),)
     FILE_EXISTS := 1

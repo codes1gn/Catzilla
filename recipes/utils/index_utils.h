@@ -122,14 +122,23 @@ struct Matrix {
   }
 
   inline __device__ Matrix dist_ex(Coord tile_var) {
+    // shape = 8 x 2
+    // y in 0-4, x in 0-4
     Matrix ret = Matrix(data + tile_var.x * stride.x + tile_var.y * stride.y, shape, stride);
     return std::move(ret);
   }
 
-  inline __device__ Matrix& dist_nocopy(Coord tile_var) {
-    data += tile_var.x * stride.x + tile_var.y * stride.y;
-    return *this;
+  inline __device__ Matrix dist_flatten(int flat_id) {
+    int row_in_current = flat_id / shape.y;
+    int col_in_current = flat_id % shape.y;
+    Matrix ret = Matrix(data + row_in_current * stride.x + col_in_current * stride.y, shape, stride);
+    return std::move(ret);
   }
+
+  // inline __device__ Matrix& dist_nocopy(Coord tile_var) {
+  //   data += tile_var.x * stride.x + tile_var.y * stride.y;
+  //   return *this;
+  // }
 
   __device__ void operator=(const Matrix& other) {
     *data = *(other.data);
