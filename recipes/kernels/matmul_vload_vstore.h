@@ -11,8 +11,20 @@
 #include "utils/macros.h"
 #include "utils/micro_kernels.h"
 
-// flatten copy
-// TODO: xor-swizzle
+// TODO: about code
+// move lhs and rhs tests to identity
+// move reg tile into dist-to-thread, make it performant and opaque to user
+//
+// NOTE: current advantages
+// no handle threads
+// no handle tiles within sm-block
+// reg-level tiling size and binding rule to threads are auto'd
+// coalescing and swizzle are auto'd
+//
+// TODO: new features
+// vmm instuctions in micro-kernels
+// xor-swizzle not impl'd
+//
 template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
           const int N_REG, const int K_REG, const int X_THREAD,
           const int Y_THREAD>
