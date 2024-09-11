@@ -11,8 +11,6 @@
 #include "utils/macros.h"
 #include "utils/micro_kernels.h"
 
-// flatten copy
-// TODO: xor-swizzle
 template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
           const int N_REG, const int K_REG, const int X_THREAD,
           const int Y_THREAD>
@@ -82,6 +80,9 @@ __global__ void _catzilla_matmul_flatten_copy(int M, int N, int K, float alpha,
   for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
 #pragma unroll
     for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
+      // out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+      //   .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
+      //   <= partial_sum;
       out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
         .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
         .dist_to_thread()
@@ -90,35 +91,20 @@ __global__ void _catzilla_matmul_flatten_copy(int M, int N, int K, float alpha,
   }
 }
 
-// TODO: what if K_TILE < X_THREAD OR Y_THREAD, a thread-var cannot bind to
-// K_TILE dim solely XOR-SWIZZLE
 void catzilla_matmul_flatten_copy(int M, int N, int K, float alpha, float *A,
                                   float *B, float beta, float *C)
 {
-  // for bench
-  // const int M_TILE = 128;
-  // const int K_TILE = 32;
-  // const int N_TILE = 128;
-  // const int M_REG = 32;
-  // const int K_REG = 8;
-  // const int N_REG = 32;
-  // const int X_THREAD = 16;
-  // const int Y_THREAD = 16;
-
-  // for debug only
-  const int M_TILE = 16;
-  const int K_TILE = 4;
-  const int N_TILE = 16;
-  const int M_REG = 8;
-  const int K_REG = 4;
-  const int N_REG = 8;
-  const int X_THREAD = 4;
-  const int Y_THREAD = 4;
-  // sec 3, K_TILE >= N_THREAD, AND M_THREAD
+  const int M_TILE = 128;
+  const int K_TILE = 32;
+  const int N_TILE = 128;
+  const int M_REG = 32;
+  const int K_REG = 8;
+  const int N_REG = 32;
+  const int X_THREAD = 32;
+  const int Y_THREAD = 8;
   assert(M_REG * K_REG > X_THREAD * Y_THREAD);
   assert(N_REG * K_REG > X_THREAD * Y_THREAD);
 
-  // K_TILE > Y_THREAD
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(X_THREAD, Y_THREAD);
   cudaFuncSetAttribute(
@@ -129,6 +115,30 @@ void catzilla_matmul_flatten_copy(int M, int N, int K, float alpha, float *A,
   _catzilla_matmul_flatten_copy<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG,
                                 X_THREAD, Y_THREAD>
     <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+
+  // const int M_TILE = 16;
+  // const int K_TILE = 8;
+  // const int N_TILE = 16;
+  // const int M_REG = 8;
+  // const int K_REG = 4;
+  // const int N_REG = 8;
+  // const int X_THREAD = 8;
+  // const int Y_THREAD = 4;
+  // assert(M_REG * K_REG > X_THREAD * Y_THREAD);
+  // assert(N_REG * K_REG > X_THREAD * Y_THREAD);
+  //
+  // dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
+  // dim3 blockDim(X_THREAD, Y_THREAD);
+  // cudaFuncSetAttribute(
+  //   _catzilla_matmul_flatten_copy<M_TILE, N_TILE, K_TILE, M_REG, N_REG,
+  //   K_REG,
+  //                                 X_THREAD, Y_THREAD>,
+  //   cudaFuncAttributePreferredSharedMemoryCarveout,
+  //   cudaSharedmemCarveoutMaxShared);
+  // _catzilla_matmul_flatten_copy<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG,
+  //                               X_THREAD, Y_THREAD>
+  //   <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+  return;
 }
 
 #endif // CATZILLA_RECIPES_KERNELS_MATMUL_FLATTEN_COPY_H_

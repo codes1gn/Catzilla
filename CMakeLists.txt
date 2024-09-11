@@ -14,7 +14,10 @@ set(CMAKE_CXX_STANDARD 20)
 
 # in debug mode, add debug symbols to device code
 # this disables most optimizations and kills performance
-add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-G;-src-in-ptx;-lineinfo>")
+
+# -G and -lineinfo conflicts
+# add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-G;-src-in-ptx;-lineinfo>")
+add_compile_options("$<$<AND:$<CONFIG:RelWithDebInfo>,$<COMPILE_LANGUAGE:CUDA>>:-src-in-ptx;-lineinfo>")
 # add_compile_options("--ptxas-options=-v")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

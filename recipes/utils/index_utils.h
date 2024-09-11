@@ -2,6 +2,7 @@
 #define CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
 
 #include <algorithm>
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cublas_v2.h>
@@ -192,9 +193,39 @@ struct Matrix {
   //   return *this;
   // }
 
+  __device__ void operator<=(const Matrix &other)
+  {
+    int total_threads = blockDim.x * blockDim.y;
+    int total_elements = shape.x * shape.y;
+    for (int i = 0; i < total_elements / total_threads; i++) {
+      // if (threadIdx.x == 0 && threadIdx.y == 0)
+      //   printf("i = %d; total_elements = %d; total_threads = %d\n", i,
+      //   total_elements, total_threads);
+      // int id = i*total_threads;
+      int id = i * total_threads + threadIdx.y * blockDim.x + threadIdx.x;
+      int row_in_thread = id / shape.y;
+      int col_in_thread = id % shape.y;
+      int offset = row_in_thread * stride.x + col_in_thread * stride.y;
+      // if (threadIdx.x == 0 && threadIdx.y == 0)
+      //   printf("id = %d; row_in_thread = %d; col_in_thread = %d; offset =
+      //   %d\n", id, row_in_thread, col_in_thread, offset);
+
+      int row_in_thread_ot = id / other.shape.y;
+      int col_in_thread_ot = id % other.shape.y;
+      int offset_ot
+        = row_in_thread_ot * other.stride.x + col_in_thread_ot * other.stride.y;
+      // if (threadIdx.x == 0 && threadIdx.y == 0)
+      //   printf("id = %d; row_in_thread_ot = %d; col_in_thread_ot = %d;
+      //   offset_ot = %d\n", id, row_in_thread_ot, col_in_thread_ot,
+      //   offset_ot);
+
+      data[offset] = other.data[offset_ot];
+    }
+    // *data = *(other.data);
+  }
   __device__ void operator=(const Matrix &other)
   {
-    *data = *(other.data);
+    *data = *other.data;
   }
 
   __device__ void operator=(const float other_scalar)

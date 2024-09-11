@@ -64,14 +64,15 @@ build: query-gpu-arch
 		-GNinja
 	@ninja -C $(BUILD_DIR)
 
-debug:
+debug: query-gpu-arch
 	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug .. \
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=RelWithDebInfo .. \
 		-DCUDA_COMPUTE_CAPABILITY=$(CUDA_COMPUTE_CAPABILITY) \
 		-DCMAKE_CUDA_COMPILER=nvcc \
-		-DCMAKE_CUDA_FLAGS="-maxrregcount=64 --ptxas-options=-v --expt-relaxed-constexpr" \
+		-DCMAKE_CUDA_FLAGS="-maxrregcount=128 --ptxas-options=-v --expt-relaxed-constexpr" \
 		-GNinja
 	@ninja -C $(BUILD_DIR)
+
 
 clean:
 	@rm -rf $(BUILD_DIR)
@@ -101,7 +102,7 @@ analysis:
 bench: build
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 100 -warmup 10
 
-dev: build
+dev: build 
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 16 -size-n 16 -size-k 16
 
 format:
