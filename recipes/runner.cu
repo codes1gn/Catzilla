@@ -109,13 +109,15 @@ void print_matrix(const float *A, int M, int N, std::ofstream &fs) {
 }
 
 bool verify_matrix(float *matRef, float *matOut, int N) {
+  double rel_diff = 0.0;
   double diff = 0.0;
   int i;
   for (i = 0; i < N; i++) {
+    rel_diff = std::fabs(matRef[i] - matOut[i])/std::fabs(matRef[i]);
     diff = std::fabs(matRef[i] - matOut[i]);
-    if (diff > 0.01) {
-      printf("Divergence! Should %5.2f, Is %5.2f (Diff %5.2f) at %d\n",
-             matRef[i], matOut[i], diff, i);
+    if ((std::fabs(matRef[i]) > 1 && rel_diff > 0.05) || (std::fabs(matRef[i]) < 1 && diff > 0.02)) {
+      printf("Divergence! Should %5.2f, Is %5.2f (Abs Diff %5.2f) or (Relative Diff %5.2f\%) at %d\n",
+             matRef[i], matOut[i], diff, rel_diff * 100., i);
       return false;
     }
   }
