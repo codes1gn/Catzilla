@@ -26,6 +26,21 @@ inline __device__ void matmul_kernel_32x32x32(float *lhs, float *rhs,
   return;
 }
 
+inline __device__ void matmul_kernel_16x16x16_thread_32(float *lhs, float *rhs,
+                                                        float *out_shared)
+{
+  int tid_x = threadIdx.x % 16;
+  int tid_y = threadIdx.x / 16; // 0-1
+  for (int pos = 0; pos < 8; pos++) {
+    float out = out_shared[distribute_(tid_x, tid_y + 2 * pos, 1, 16)];
+    for (int i = 0; i < 16; i++) {
+      out += lhs[pos * 32 + tid_y * 16 + i] * rhs[i * 16 + tid_x];
+    }
+    out_shared[distribute_(tid_x, tid_y + 2 * pos, 1, 16)] = out;
+  }
+  return;
+}
+
 inline __device__ void matmul_kernel_16x16x16_thread_32(half *lhs, half *rhs,
                                                         float *out_shared)
 {
@@ -185,6 +200,21 @@ inline __device__ void matmul_kernel_pad_swizzled(float *lhs, float *rhs,
         out[m * CEIL_DIV(N, THD_X) + n]
           += lhs[m * THD_Y * (K + 1) + threadIdx.y * (K + 1) + k]
              * rhs[k * (N + 1) + THD_X * n + threadIdx.x];
+  __syncthreads();
+  return;
+}
+
+// first kernel use Matrix as type
+template <const int M, const int N>
+inline __device__ void identity(Matrix inp, Matrix out)
+{
+  int THREADS = blockDim.x * blockDim.y;
+  int ELEMENTS = M * N;
+  int CHUNKS = CEIL_DIV(ELEMENTS, THREADS);
+  int ROWPERCK = CEIL_DIV(THREADS, N);
+  for (int ck = 0; ck < CHUNKS; ck++)
+    out.tile_ex(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread()
+      = inp.tile_ex(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread();
   __syncthreads();
   return;
 }

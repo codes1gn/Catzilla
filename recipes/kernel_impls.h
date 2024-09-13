@@ -27,7 +27,7 @@ inline void catzilla_matmul_exec(int impl_idx, int M, int N, int K, float alpha,
     catzilla_matmul_vload_vstore(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 11) {
     // use wmma.mma.sync.m16.n16.k16
-    catzilla_matmul_v1_t32(M, N, K, alpha, A, B, beta, C);
+    catzilla_matmul_wmma_basic_test(M, N, K, alpha, A, B, beta, C);
   }
 }
 
