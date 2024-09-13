@@ -26,10 +26,13 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 # Configure header file search paths
 include_directories(${CUDA_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/catz)
+
 # Configure the source file path to be compiled
 add_subdirectory(${PROJECT_SOURCE_DIR}/references)
 
 # Catzilla impls on various operators
+add_subdirectory(${PROJECT_SOURCE_DIR}/catz)
 add_subdirectory(${PROJECT_SOURCE_DIR}/recipes)
 
 # ==============================================================
@@ -37,9 +40,14 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/recipes)
 # ==============================================================
 
 # config clang-format target
+# Catz: cuda-enhanced programming model for catzilla
+# Recipes: kernel/operator recipes for computing
 file(GLOB_RECURSE ALL_SOURCE_FILES
+ ${CMAKE_SOURCE_DIR}/catz/*.cpp
+ ${CMAKE_SOURCE_DIR}/catz/*.h
  ${CMAKE_SOURCE_DIR}/recipes/*.cpp
- ${CMAKE_SOURCE_DIR}/recipes/*.h)
+ ${CMAKE_SOURCE_DIR}/recipes/*.h
+)
 
 # Define CMAKE target for invoking clang-format
 add_custom_command(

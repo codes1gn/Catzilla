@@ -7,9 +7,9 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#include "utils/index_utils.h"
-#include "utils/macros.h"
-#include "utils/micro_kernels.h"
+#include "index_utils.h"
+#include "macros.h"
+#include "micro_kernels.h"
 
 // TODO: about code
 // move lhs and rhs tests to identity

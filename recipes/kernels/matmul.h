@@ -6,9 +6,9 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#include "utils/index_utils.h"
-#include "utils/macros.h"
-#include "utils/micro_kernels.h"
+#include "index_utils.h"
+#include "macros.h"
+#include "micro_kernels.h"
 
 /*
  * TODO:
@@ -653,10 +653,11 @@ __global__ void _catzilla_matmul_v1_t32(int M, int N, int K, float alpha,
     }
     __syncthreads();
 
-    matmul_kernel_16x16x16_thread_32(lhs_shared_mat.data, rhs_shared_mat.data,
-                                     out_shared_mat.data);
-    // matmul_kernel_m16n16k16(lhs_shared_mat.data, rhs_shared_mat.data,
-    // out_shared_mat.data);
+    // matmul_kernel_16x16x16_thread_32(lhs_shared_mat.data,
+    // rhs_shared_mat.data,
+    //                                  out_shared_mat.data);
+    matmul_kernel_m16n16k16(lhs_shared_mat.data, rhs_shared_mat.data,
+                            out_shared_mat.data);
     __syncthreads();
   }
   for (int m = 0; m < CEIL_DIV(M_TILE, 2); m++) { // range(0, 128, 1)

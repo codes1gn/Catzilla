@@ -7,9 +7,9 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#include "utils/index_utils.h"
-#include "utils/macros.h"
-#include "utils/micro_kernels.h"
+#include "index_utils.h"
+#include "macros.h"
+#include "micro_kernels.h"
 
 template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
           const int N_REG, const int K_REG, const int X_THREAD,

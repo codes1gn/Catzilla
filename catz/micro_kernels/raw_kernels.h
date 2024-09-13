@@ -1,5 +1,5 @@
-#ifndef CATZILLA_RECIPES_UTILS_MICRO_KERNELS_H_
-#define CATZILLA_RECIPES_UTILS_MICRO_KERNELS_H_
+#ifndef CATZILLA_RECIPES_UTILS_MICRO_KERNELS_RAW_KERNELS_H_
+#define CATZILLA_RECIPES_UTILS_MICRO_KERNELS_RAW_KERNELS_H_
 
 #include <cstdio>
 #include <cstdlib>
@@ -39,43 +39,6 @@ inline __device__ void matmul_kernel_16x16x16_thread_32(half *lhs, half *rhs,
     out_shared[distribute_(tid_x, tid_y + 2 * pos, 1, 16)] = out;
   }
   return;
-}
-
-__global__ void convertFloatToHalf(float *input, half *output, int numElements)
-{
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < numElements) {
-    output[idx] = __float2half(input[idx]); // 使用CUDA提供的转换函数
-  }
-}
-
-// C += A * B
-// m16.n16.k16
-// row-major, col-major
-inline __device__ void matmul_kernel_m16n16k16(half *a_half, half *b_half,
-                                               float *c)
-{
-  // Declare the fragments
-  wmma::fragment<wmma::matrix_a, 16, 16, 16, half, wmma::row_major> A_frag;
-  wmma::fragment<wmma::matrix_b, 16, 16, 16, half, wmma::row_major> B_frag;
-  wmma::fragment<wmma::accumulator, 16, 16, 16, float> C_frag;
-
-  // wmma::fill_fragment(C_frag, 0.0f);
-
-  // NOTE: this is wrong, reinterpret only casts ptr type, not contents
-  // half *a_half = reinterpret_cast<half *>(a);
-  // half *b_half = reinterpret_cast<half *>(b);
-
-  // Assuming leading dimension is 16
-  wmma::load_matrix_sync(A_frag, a_half, 16);
-  wmma::load_matrix_sync(B_frag, b_half, 16);
-  wmma::load_matrix_sync(C_frag, c, 16, wmma::mem_row_major);
-
-  // Perform the matrix multiplication
-  wmma::mma_sync(C_frag, A_frag, B_frag, C_frag);
-
-  // Store the result
-  wmma::store_matrix_sync(c, C_frag, 16, wmma::mem_row_major);
 }
 
 // out[2][2]
@@ -226,4 +189,4 @@ inline __device__ void matmul_kernel_pad_swizzled(float *lhs, float *rhs,
   return;
 }
 
-#endif // CATZILLA_RECIPES_UTILS_MICRO_KERNELS_H_
+#endif // CATZILLA_RECIPES_UTILS_MICRO_KERNELS_RAW_KERNELS_H_
