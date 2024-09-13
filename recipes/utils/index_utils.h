@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cublas_v2.h>
+#include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <iostream>
 #include <tuple>
@@ -96,6 +97,7 @@ struct Coord {
 };
 
 // keep in mind, always row major
+// TODO: make it T tempalted
 struct Matrix {
   float *data;
   Coord shape;
@@ -245,6 +247,166 @@ struct Matrix {
   }
 };
 
+// template<typename T>
+struct MatrixH {
+  half *data;
+  Coord shape;
+  Coord stride;
+
+  __device__ MatrixH(half *data, Coord shape)
+      : data(data)
+      , shape(shape)
+      , stride(Coord(shape.y, 1))
+  {
+  }
+
+  __device__ MatrixH(half *data, Coord shape, Coord stride)
+      : data(data)
+      , shape(shape)
+      , stride(stride)
+  {
+  }
+
+  __device__ MatrixH(const MatrixH &other)
+      : data(other.data)
+      , shape(other.shape)
+      , stride(other.stride)
+  {
+  }
+
+  __device__ MatrixH(MatrixH &&other) noexcept
+      : data(other.data)
+      , shape(other.shape)
+      , stride(other.stride)
+  {
+    other.data = nullptr;
+  }
+
+  __device__ MatrixH inc(int value)
+  {
+    data += value;
+    return *this;
+  }
+
+  inline __device__ MatrixH distribute(Coord id, Coord stride)
+  {
+    MatrixH ret = MatrixH(data + id.x * stride.x + id.y * stride.y, shape);
+    return std::move(ret);
+  }
+
+  inline __device__ MatrixH tile(Coord id, Coord from_stride, Coord to_stride)
+  {
+    MatrixH ret = MatrixH(data + id.x * from_stride.x * to_stride.x
+                            + id.y * from_stride.y * to_stride.y,
+                          shape);
+    return std::move(ret);
+  }
+
+  inline __device__ MatrixH tile_ex(Coord tile_var, Coord other_shape)
+  {
+    MatrixH ret = MatrixH(data + tile_var.x * other_shape.x * stride.x
+                            + tile_var.y * other_shape.y * stride.y,
+                          other_shape, stride);
+    return std::move(ret);
+  }
+
+  inline __device__ MatrixH dist_ex(Coord tile_var)
+  {
+    // shape = 8 x 2
+    // y in 0-4, x in 0-4
+    MatrixH ret = MatrixH(data + tile_var.x * stride.x + tile_var.y * stride.y,
+                          shape, stride);
+    return std::move(ret);
+  }
+
+  inline __device__ MatrixH dist_flatten(int flat_id)
+  {
+    int row_in_current = flat_id / shape.y;
+    int col_in_current = flat_id % shape.y;
+    MatrixH ret
+      = MatrixH(data + row_in_current * stride.x + col_in_current * stride.y,
+                shape, stride);
+    return std::move(ret);
+  }
+
+  inline __device__ MatrixH dist_to_thread()
+  {
+    int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
+    int row_in_current = flat_id / shape.y;
+    int col_in_current = flat_id % shape.y;
+    MatrixH ret
+      = MatrixH(data + row_in_current * stride.x + col_in_current * stride.y,
+                shape, stride);
+    return std::move(ret);
+  }
+
+  // inline __device__ MatrixH& dist_nocopy(Coord tile_var) {
+  //   data += tile_var.x * stride.x + tile_var.y * stride.y;
+  //   return *this;
+  // }
+
+  __device__ void operator<=(const MatrixH &other)
+  {
+    int total_threads = blockDim.x * blockDim.y;
+    int total_elements = shape.x * shape.y;
+    for (int i = 0; i < total_elements / total_threads; i++) {
+      // if (threadIdx.x == 0 && threadIdx.y == 0)
+      //   printf("i = %d; total_elements = %d; total_threads = %d\n", i,
+      //   total_elements, total_threads);
+      // int id = i*total_threads;
+      int id = i * total_threads + threadIdx.y * blockDim.x + threadIdx.x;
+      int row_in_thread = id / shape.y;
+      int col_in_thread = id % shape.y;
+      int offset = row_in_thread * stride.x + col_in_thread * stride.y;
+      // if (threadIdx.x == 0 && threadIdx.y == 0)
+      //   printf("id = %d; row_in_thread = %d; col_in_thread = %d; offset =
+      //   %d\n", id, row_in_thread, col_in_thread, offset);
+
+      int row_in_thread_ot = id / other.shape.y;
+      int col_in_thread_ot = id % other.shape.y;
+      int offset_ot
+        = row_in_thread_ot * other.stride.x + col_in_thread_ot * other.stride.y;
+      // if (threadIdx.x == 0 && threadIdx.y == 0)
+      //   printf("id = %d; row_in_thread_ot = %d; col_in_thread_ot = %d;
+      //   offset_ot = %d\n", id, row_in_thread_ot, col_in_thread_ot,
+      //   offset_ot);
+
+      data[offset] = other.data[offset_ot];
+    }
+    // *data = *(other.data);
+  }
+  __device__ void operator=(const MatrixH &other)
+  {
+    *data = *other.data;
+  }
+
+  __device__ void operator=(const Matrix &other)
+  {
+    *data = __float2half(*other.data);
+  }
+
+  __device__ void operator=(const float other_scalar)
+  {
+    *data = __float2half(other_scalar);
+  }
+
+  __device__ void operator=(const half other_scalar)
+  {
+    *data = other_scalar;
+  }
+
+  // __device__ void print() const
+  // {
+  //   for (size_t i = 0; i < shape.x; ++i) {
+  //     for (size_t j = 0; j < shape.y; ++j) {
+  //       std::cout << data[i * shape.x + j * shape.y] << " ";
+  //     }
+  //     std::cout << "\n";
+  //   }
+  //   std::cout << std::endl;
+  // }
+};
+
 // helper for shared decl
 // template<Coord shape>
 template <int x, int y> __device__ Matrix make_shared()
@@ -252,6 +414,14 @@ template <int x, int y> __device__ Matrix make_shared()
   __shared__ float _data[x * y];
   // extern __shared__ float _data[];
   return Matrix(_data, Coord(x, y));
+}
+
+template <int x, int y> __device__ MatrixH make_shared_half()
+{
+  // TODO: limit T
+  __shared__ half _data[x * y];
+  // extern __shared__ float _data[];
+  return MatrixH((half *)_data, Coord(x, y));
 }
 
 template <int x, int y> __device__ Matrix make_local()
