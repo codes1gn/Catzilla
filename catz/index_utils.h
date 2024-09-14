@@ -1,6 +1,7 @@
 #ifndef CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
 #define CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
 
+#include "macros.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
@@ -177,6 +178,18 @@ struct Matrix {
       = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
                shape, stride);
     return std::move(ret);
+  }
+
+  inline __device__ void fill(float value)
+  {
+    int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
+    int row_in_current = flat_id / shape.y;
+    int col_in_current = flat_id % shape.y;
+    int elements = shape.x * shape.y;
+    int threads = blockDim.x * blockDim.y;
+    for (int chunk = 0; chunk < CEIL_DIV(elements, threads); chunk++) {
+      data[chunk * threads + flat_id] = value;
+    }
   }
 
   inline __device__ Matrix dist_to_thread()

@@ -26,6 +26,37 @@ inline __device__ void matmul_kernel_32x32x32(float *lhs, float *rhs,
   return;
 }
 
+inline __device__ void matmul_kernel_16x16x16_thread_32(Matrix lhs, Matrix rhs,
+                                                        float *out_shared)
+{
+  int tid_x = threadIdx.x % 16;
+  int tid_y = threadIdx.x / 16; // 0-1
+  for (int pos = 0; pos < 8; pos++) {
+    float out = out_shared[distribute_(tid_x, tid_y + 2 * pos, 1, 16)];
+    for (int i = 0; i < 16; i++) {
+      out += lhs.data[pos * 32 + tid_y * 16 + i] * rhs.data[i * 16 + tid_x];
+    }
+    out_shared[distribute_(tid_x, tid_y + 2 * pos, 1, 16)] = out;
+  }
+  return;
+}
+
+inline __device__ void
+matmul_kernel_16x16x16_thread_32(MatrixH lhs, MatrixH rhs, float *out_shared)
+{
+  int tid_x = threadIdx.x % 16;
+  int tid_y = threadIdx.x / 16; // 0-1
+  for (int pos = 0; pos < 8; pos++) {
+    float out = out_shared[distribute_(tid_x, tid_y + 2 * pos, 1, 16)];
+    for (int i = 0; i < 16; i++) {
+      out += __half2float(lhs.data[pos * 32 + tid_y * 16 + i]
+                          * rhs.data[i * 16 + tid_x]);
+    }
+    out_shared[distribute_(tid_x, tid_y + 2 * pos, 1, 16)] = out;
+  }
+  return;
+}
+
 inline __device__ void matmul_kernel_16x16x16_thread_32(float *lhs, float *rhs,
                                                         float *out_shared)
 {

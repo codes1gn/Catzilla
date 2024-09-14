@@ -97,14 +97,14 @@ int main(int argc, char **argv) {
   C = (float *)malloc(sizeof(float) * M * N);
   C_ref = (float *)malloc(sizeof(float) * M * N);
 
-  randomise(A, M * K);
-  randomise(B, K * N);
+  // randomise(A, M * K);
+  // randomise(B, K * N);
 
   // ranges(A, M * K);
   // ranges(B, K * N);
 
-  // ones(A, M * K);
-  // ones(B, K * N);
+  ones(A, M * K);
+  ones(B, K * N);
 
   cudaCheck(cudaMalloc((void **)&dA, sizeof(float) * M * K));
   cudaCheck(cudaMalloc((void **)&dB, sizeof(float) * K * N));

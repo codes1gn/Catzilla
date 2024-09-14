@@ -25,21 +25,20 @@ _catzilla_matmul_wmma_basic_test(int M, int N, int K, float alpha, float *lhs,
   auto rhs_sm_tile_shape = Coord(K_TILE, N_TILE);
   auto out_sm_tile_shape = Coord(M_TILE, N_TILE);
 
-  auto lhs_reg_tile_shape = Coord(M_REG, N_REG);
-  auto rhs_reg_tile_shape = Coord(K_REG, N_REG);
-  auto out_reg_tile_shape = Coord(M_REG, N_REG);
-
   // make sure inner block looks like this, to ensure coalescing
 
   Matrix lhs_mat = Matrix(lhs, lhs_shape);
   Matrix rhs_mat = Matrix(rhs, rhs_shape);
   Matrix out_mat = Matrix(out, out_shape);
 
-  __shared__ float lhs_shared[M_TILE * K_TILE];
-  __shared__ float rhs_shared[K_TILE * N_TILE];
+  __shared__ half lhs_shared[M_TILE * K_TILE];
+  __shared__ half rhs_shared[K_TILE * N_TILE];
+  __shared__ float out_shared[M_TILE * N_TILE];
 
-  Matrix lhs_shared_mat = Matrix(lhs_shared, lhs_sm_tile_shape);
-  Matrix rhs_shared_mat = Matrix(rhs_shared, rhs_sm_tile_shape);
+  MatrixH lhs_shared_mat = MatrixH(lhs_shared, lhs_sm_tile_shape);
+  MatrixH rhs_shared_mat = MatrixH(rhs_shared, rhs_sm_tile_shape);
+  Matrix out_shared_mat = Matrix(out_shared, out_sm_tile_shape);
+  out_shared_mat.fill(0.);
 
   // TODO: wrong, since this will release shared after make_shared call
   // impl a Macro based make_shared and make_local, ensure it won't release
@@ -50,55 +49,47 @@ _catzilla_matmul_wmma_basic_test(int M, int N, int K, float alpha, float *lhs,
   // Bytes
   //
 
-  Matrix partial_sum
-    = make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD)>();
+  // Matrix partial_sum
+  //   = make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD)>();
 
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
-    for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
+    for (int m = 0; m < CEIL_DIV(M_TILE, 2); m++) {
 #pragma unroll
-      for (int kin = 0; kin < CEIL_DIV(K_TILE, N_REG); kin++) {
-        lhs_shared_mat.tile_ex(Coord(m, kin), lhs_reg_tile_shape)
-          .dist_to_thread()
+      for (int kin = 0; kin < CEIL_DIV(K_TILE, 16); kin++) {
+        lhs_shared_mat.tile_ex(Coord(m, kin), Coord(2, 16)).dist_to_thread()
           = lhs_mat.tile_ex(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-              .tile_ex(Coord(m, kin), lhs_reg_tile_shape)
+              .tile_ex(Coord(m, kin), Coord(2, 16))
               .dist_to_thread();
       }
     }
-    for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
+    for (int kin = 0; kin < CEIL_DIV(K_TILE, 2); kin++) {
 #pragma unroll
-      for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-        rhs_shared_mat.tile_ex(Coord(kin, n), rhs_reg_tile_shape)
-          .dist_to_thread()
+      for (int n = 0; n < CEIL_DIV(N_TILE, 16); n++) {
+        rhs_shared_mat.tile_ex(Coord(kin, n), Coord(2, 16)).dist_to_thread()
           = rhs_mat.tile_ex(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
-              .tile_ex(Coord(kin, n), rhs_reg_tile_shape)
+              .tile_ex(Coord(kin, n), Coord(2, 16))
               .dist_to_thread();
       }
     }
     __syncthreads();
 
     // contract at 128x128x32 micro-kernel
-    matmul_kernel_coalesced<M_TILE, N_TILE, K_TILE, Y_THREAD, X_THREAD>(
-      lhs_shared_mat.data, rhs_shared_mat.data, partial_sum.data);
-    // identity<M_TILE, N_TILE>(rhs_shared_mat,
+    // matmul_kernel_16x16x16_thread_32(lhs_shared_mat, rhs_shared_mat,
+    // out_shared_mat.data); identity<M_TILE, N_TILE>(lhs_shared_mat,
     // out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape));
-    // __syncthreads();
     // identity<M_TILE, N_TILE>(lhs_shared_mat,
     // out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape));
-    // __syncthreads();
+    matmul_kernel_m16n16k16(lhs_shared_mat.data, rhs_shared_mat.data,
+                            out_shared_mat.data);
   }
   __syncthreads();
 
-  for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
+  for (int m = 0; m < CEIL_DIV(M_TILE, 2); m++) {
 #pragma unroll
-    for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-      // out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-      //   .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
-      //   <= partial_sum;
-      out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-        .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
-        .dist_to_thread()
-        = partial_sum.dist_ex(Coord(m, n));
-    }
+    out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+      .tile_ex(Coord(m, 0), Coord(2, 16))
+      .dist_to_thread()
+      = out_shared_mat.tile_ex(Coord(m, 0), Coord(2, 16)).dist_to_thread();
   }
 }
 
