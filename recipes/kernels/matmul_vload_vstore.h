@@ -52,26 +52,29 @@ __global__ void _catzilla_matmul_vload_vstore(int M, int N, int K, float alpha,
 
   // make sure inner block looks like this, to ensure coalescing
 
-  Matrix lhs_mat = Matrix(lhs, lhs_shape);
-  // MatrixV lhs_mat = MatrixV((float4*)lhs, lhs_shape);
-  MatrixV lhs_mat_v = MatrixV((float4 *)lhs, lhs_shape_v); // 16x4
+  Matrix<float> lhs_mat = Matrix<float>(lhs, lhs_shape);
+  // MatriV lhs_mat = Matrix<float4>((float4*)lhs, lhs_shape);
+  Matrix<float4> lhs_mat_v = Matrix<float4>((float4 *)lhs, lhs_shape_v); // 16x4
   //
-  Matrix rhs_mat = Matrix(rhs, rhs_shape);
-  MatrixV rhs_mat_v = MatrixV((float4 *)rhs, rhs_shape_v);
-  // MatrixV rhs_mat = MatrixV((float4*)rhs, rhs_shape);
-  Matrix out_mat = Matrix(out, out_shape);
-  // MatrixV out_mat_v = MatrixV((float4*)out, out_shape_v); // 16x4
+  Matrix<float> rhs_mat = Matrix<float>(rhs, rhs_shape);
+  Matrix<float4> rhs_mat_v = Matrix<float4>((float4 *)rhs, rhs_shape_v);
+  // Matrix<float4> rhs_mat = Matrix<float4>((float4*)rhs, rhs_shape);
+  Matrix<float> out_mat = Matrix<float>(out, out_shape);
+  // Matrix<float4> out_mat_v = Matrix<float4>((float4*)out, out_shape_v); //
+  // 16x4
 
   // __shared__ float lhs_shared[M_TILE* (K_TILE+1)];
 
-  // Matrix lhs_shared_mat = make_shared<M_TILE, K_TILE>();
-  MatrixV lhs_shared_mat_v = make_shared_v<M_TILE, K_TILE / 4>();
-  // Matrix rhs_shared_mat = make_shared<K_TILE, N_TILE>();
-  MatrixV rhs_shared_mat_v = make_shared_v<K_TILE, N_TILE / 4>();
+  // Matrix<float> lhs_shared_mat = make_shared<M_TILE, K_TILE>();
+  Matrix<float4> lhs_shared_mat_v = make_shared<M_TILE, K_TILE / 4, float4>();
+  // MAKE_SHARED(lhs_shared_mat_v, M_TILE, K_TILE / 4, float4);
+  // Matrix<float> rhs_shared_mat = make_shared<K_TILE, N_TILE>();
+  Matrix<float4> rhs_shared_mat_v = make_shared<K_TILE, N_TILE / 4, float4>();
+  // MAKE_SHARED(rhs_shared_mat_v, K_TILE, N_TILE / 4, float4);
   //
 
-  Matrix partial_sum
-    = make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD)>();
+  Matrix<float> partial_sum = make_local<CEIL_DIV(M_TILE, Y_THREAD),
+                                         CEIL_DIV(N_TILE, X_THREAD), float>();
 
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
     for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
@@ -126,138 +129,6 @@ __global__ void _catzilla_matmul_vload_vstore(int M, int N, int K, float alpha,
         = partial_sum.dist_ex(Coord(m, n));
     }
   }
-}
-
-template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
-          const int N_REG, const int K_REG, const int X_THREAD,
-          const int Y_THREAD>
-__global__ void _catzilla_matmul_vload_vstore_test_lhs(int M, int N, int K,
-                                                       float alpha, float *lhs,
-                                                       float *rhs, float beta,
-                                                       float *out)
-{
-  auto lhs_shape = make_coord(M, K);       // 16x16
-  auto lhs_shape_v = make_coord(M, K / 4); // 16x16
-  auto rhs_shape = make_coord(K, N);
-  auto out_shape = make_coord(M, N);
-  auto out_shape_v = make_coord(M, K / 4);
-
-  auto lhs_sm_tile_shape = Coord(M_TILE, K_TILE);       // 16x8
-  auto lhs_sm_tile_shape_v = Coord(M_TILE, K_TILE / 4); // 16x8
-  auto rhs_sm_tile_shape = Coord(K_TILE, N_TILE);
-  auto out_sm_tile_shape = Coord(M_TILE, N_TILE);
-
-  auto lhs_reg_tile_shape = Coord(M_REG, K_REG);       // 8x4
-  auto lhs_reg_tile_shape_v = Coord(M_REG, K_REG / 4); // 8x4
-  auto rhs_reg_tile_shape = Coord(K_REG, N_REG);
-  auto out_reg_tile_shape = Coord(M_REG, N_REG);
-
-  // make sure inner block looks like this, to ensure coalescing
-
-  Matrix lhs_mat = Matrix(lhs, lhs_shape);
-  MatrixV lhs_mat_v = MatrixV((float4 *)lhs, lhs_shape_v); // 16x4
-  Matrix rhs_mat = Matrix(rhs, rhs_shape);
-  // MatrixV rhs_mat = MatrixV((float4*)rhs, rhs_shape);
-  MatrixV out_mat_v = MatrixV((float4 *)out, out_shape_v); // 16x4
-  // Matrix out_mat = Matrix(out, out_shape);
-
-  // __shared__ float lhs_shared[M_TILE* (K_TILE+1)];
-
-  // Matrix lhs_shared_mat = make_shared<M_TILE, K_TILE>();
-  MatrixV lhs_shared_mat_v = make_shared_v<M_TILE, K_TILE / 4>();
-  Matrix rhs_shared_mat = make_shared<K_TILE, N_TILE>();
-  // MatrixV rhs_shared_mat = make_shared_v<K_TILE, N_TILE>();
-  // Matrix out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
-  //
-
-  for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
-    // for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) { // if use float* to
-    // transfer data with float4 space, will results in empty data
-    for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
-      for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
-        lhs_shared_mat_v.tile_ex(Coord(m, kin), lhs_reg_tile_shape_v)
-          .dist_to_thread()
-          = lhs_mat_v.tile_ex(Coord(blockIdx.y, ko), lhs_sm_tile_shape_v)
-              .tile_ex(Coord(m, kin), lhs_reg_tile_shape_v)
-              .dist_to_thread();
-      }
-    }
-    __syncthreads();
-
-    // Matrix lhs_shared_mat = Matrix((float*)lhs_shared_mat_v.data,
-    // Coord(M_TILE, K_TILE));
-    for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
-      for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
-        out_mat_v.tile_ex(Coord(blockIdx.y, ko), lhs_sm_tile_shape_v)
-          .tile_ex(Coord(m, kin), lhs_reg_tile_shape_v)
-          .dist_to_thread()
-          = lhs_shared_mat_v.tile_ex(Coord(m, kin), lhs_reg_tile_shape_v)
-              .dist_to_thread();
-      }
-    }
-  }
-  __syncthreads();
-}
-
-// move to identity
-template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
-          const int N_REG, const int K_REG, const int X_THREAD,
-          const int Y_THREAD>
-__global__ void _catzilla_matmul_vload_vstore_test_rhs(int M, int N, int K,
-                                                       float alpha, float *lhs,
-                                                       float *rhs, float beta,
-                                                       float *out)
-{
-  auto rhs_shape = make_coord(K, N);
-  auto rhs_shape_v = make_coord(K, N / 4);
-
-  auto rhs_sm_tile_shape = Coord(K_TILE, N_TILE);
-  auto rhs_sm_tile_shape_v = Coord(K_TILE, N_TILE / 4);
-
-  auto rhs_reg_tile_shape = Coord(K_REG, N_REG);
-  auto rhs_reg_tile_shape_v = Coord(K_REG, N_REG / 4);
-
-  // make sure inner block looks like this, to ensure coalescing
-
-  // Matrix rhs_mat = Matrix(rhs, rhs_shape);
-  MatrixV rhs_mat_v = MatrixV((float4 *)rhs, rhs_shape_v);
-  MatrixV out_mat_v = MatrixV((float4 *)out, rhs_shape_v); // 16x4
-  // Matrix out_mat = Matrix(out, out_shape);
-
-  // __shared__ float lhs_shared[M_TILE* (K_TILE+1)];
-
-  // Matrix lhs_shared_mat = make_shared<M_TILE, K_TILE>();
-  // Matrix rhs_shared_mat = make_shared<K_TILE, N_TILE/4>();
-  MatrixV rhs_shared_mat_v = make_shared_v<K_TILE, N_TILE / 4>();
-  //
-
-  for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
-    for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
-#pragma unroll
-      for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-        rhs_shared_mat_v.tile_ex(Coord(kin, n), rhs_reg_tile_shape_v)
-          .dist_to_thread()
-          = rhs_mat_v.tile_ex(Coord(ko, blockIdx.x), rhs_sm_tile_shape_v)
-              .tile_ex(Coord(kin, n), rhs_reg_tile_shape_v)
-              .dist_to_thread();
-      }
-    }
-    __syncthreads();
-
-    // Matrix lhs_shared_mat = Matrix((float*)lhs_shared_mat_v.data,
-    // Coord(M_TILE, K_TILE));
-    for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
-#pragma unroll
-      for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-        out_mat_v.tile_ex(Coord(ko, blockIdx.x), rhs_sm_tile_shape_v)
-          .tile_ex(Coord(kin, n), rhs_reg_tile_shape_v)
-          .dist_to_thread()
-          = rhs_shared_mat_v.tile_ex(Coord(kin, n), rhs_reg_tile_shape_v)
-              .dist_to_thread();
-      }
-    }
-  }
-  __syncthreads();
 }
 
 // TODO: what if K_TILE < X_THREAD OR Y_THREAD, a thread-var cannot bind to

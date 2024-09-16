@@ -26,7 +26,8 @@ inline __device__ void matmul_kernel_32x32x32(float *lhs, float *rhs,
   return;
 }
 
-inline __device__ void matmul_kernel_16x16x16_thread_32(Matrix lhs, Matrix rhs,
+inline __device__ void matmul_kernel_16x16x16_thread_32(Matrix<float> lhs,
+                                                        Matrix<float> rhs,
                                                         float *out_shared)
 {
   int tid_x = threadIdx.x % 16;
@@ -41,8 +42,9 @@ inline __device__ void matmul_kernel_16x16x16_thread_32(Matrix lhs, Matrix rhs,
   return;
 }
 
-inline __device__ void
-matmul_kernel_16x16x16_thread_32(MatrixH lhs, MatrixH rhs, float *out_shared)
+inline __device__ void matmul_kernel_16x16x16_thread_32(Matrix<half> lhs,
+                                                        Matrix<half> rhs,
+                                                        float *out_shared)
 {
   int tid_x = threadIdx.x % 16;
   int tid_y = threadIdx.x / 16; // 0-1
@@ -235,9 +237,9 @@ inline __device__ void matmul_kernel_pad_swizzled(float *lhs, float *rhs,
   return;
 }
 
-// first kernel use Matrix as type
+// first kernel use Matrix<float> as type
 template <const int M, const int N>
-inline __device__ void identity(Matrix inp, Matrix out)
+inline __device__ void identity(Matrix<float> inp, Matrix<float> out)
 {
   int THREADS = blockDim.x * blockDim.y;
   int ELEMENTS = M * N;

@@ -3,8 +3,12 @@
 
 #define CEIL_DIV(dividend, divisor) (((dividend) + (divisor)-1) / (divisor))
 
-#define MAKE_SHARED(matrixVar, shape)                                          \
-  __shared__ float matrixVar##_data[shape.x * shape.y];                        \
-  Matrix matrixVar(matrixVar##_data, shape)
+#define MAKE_SHARED(matrixVar, size, type)                                     \
+  __shared__ type matrixVar##_data[size];                                      \
+  Matrix<type> matrixVar = Matrix<type>(matrixVar##_data, Coord(1, size))
+
+#define MAKE_SHARED(matrixVar, size_x, size_y, type)                           \
+  __shared__ type matrixVar##_data[size_x * size_y];                           \
+  Matrix<type> matrixVar = Matrix<type>(matrixVar##_data, Coord(size_x, size_y))
 
 #endif // CATZILLA_RECIPES_UTILS_MACROS_H_

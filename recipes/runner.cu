@@ -115,7 +115,7 @@ bool verify_matrix(float *matRef, float *matOut, int N) {
   for (i = 0; i < N; i++) {
     rel_diff = std::fabs(matRef[i] - matOut[i])/std::fabs(matRef[i]);
     diff = std::fabs(matRef[i] - matOut[i]);
-    if ((std::fabs(matRef[i]) > 1 && rel_diff > 0.05) || (std::fabs(matRef[i]) < 1 && diff > 0.02)) {
+    if ((std::fabs(matRef[i]) > 1 && rel_diff > 0.05) && (std::fabs(matRef[i]) < 1 && diff > 0.02)) {
       printf("Divergence! Should %5.2f, Is %5.2f (Abs Diff %5.2f) or (Relative Diff %5.2f\%) at %d\n",
              matRef[i], matOut[i], diff, rel_diff * 100., i);
       return false;

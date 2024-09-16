@@ -293,15 +293,15 @@ __global__ void _catzilla_matmul_v4(int M, int N, int K, float alpha,
   auto rhs_reg_tile_shape = Coord(K_TILE_SM, N_TILE_REG);
   auto out_reg_tile_shape = Coord(M_TILE_REG, N_TILE_REG);
 
-  Matrix lhs_mat = Matrix(lhs, lhs_shape);
-  Matrix rhs_mat = Matrix(rhs, rhs_shape);
-  Matrix out_mat = Matrix(out, out_shape);
+  Matrix<float> lhs_mat = Matrix<float>(lhs, lhs_shape);
+  Matrix<float> rhs_mat = Matrix<float>(rhs, rhs_shape);
+  Matrix<float> out_mat = Matrix<float>(out, out_shape);
 
-  Matrix lhs_shared_mat = make_shared<M_TILE_SM, K_TILE_SM>();
-  Matrix rhs_shared_mat = make_shared<K_TILE_SM, N_TILE_SM>();
-  // Matrix out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
+  Matrix<float> lhs_shared_mat = make_shared<M_TILE_SM, K_TILE_SM, float>();
+  Matrix<float> rhs_shared_mat = make_shared<K_TILE_SM, N_TILE_SM, float>();
+  // Matrix<float> out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
 
-  Matrix partial_sum = make_local<M_TILE_REG, N_TILE_REG>();
+  Matrix<float> partial_sum = make_local<M_TILE_REG, N_TILE_REG, float>();
 
   // iter vars we got, block.x, block.y, thread.x, thread.y, k, mreg.
   // because we distribute out into blocks, we select one of blk.x or blk.y
@@ -407,17 +407,17 @@ __global__ void _catzilla_matmul_v5(int M, int N, int K, float alpha,
   // make sure inner block looks like this, to ensure coalescing
   auto per_block_data_shape = Coord(Y_THREAD, X_THREAD);
 
-  Matrix lhs_mat = Matrix(lhs, lhs_shape);
-  Matrix rhs_mat = Matrix(rhs, rhs_shape);
-  Matrix out_mat = Matrix(out, out_shape);
+  Matrix<float> lhs_mat = Matrix<float>(lhs, lhs_shape);
+  Matrix<float> rhs_mat = Matrix<float>(rhs, rhs_shape);
+  Matrix<float> out_mat = Matrix<float>(out, out_shape);
 
-  Matrix lhs_shared_mat = make_shared<M_TILE, K_TILE>();
-  Matrix rhs_shared_mat = make_shared<K_TILE, N_TILE>();
-  // Matrix out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
+  Matrix<float> lhs_shared_mat = make_shared<M_TILE, K_TILE, float>();
+  Matrix<float> rhs_shared_mat = make_shared<K_TILE, N_TILE, float>();
+  // Matrix<float> out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
   //
 
-  Matrix partial_sum
-    = make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD)>();
+  Matrix<float> partial_sum = make_local<CEIL_DIV(M_TILE, Y_THREAD),
+                                         CEIL_DIV(N_TILE, X_THREAD), float>();
 
   // int threadId = threadIdx.y * X_THREAD + threadIdx.x;
 
@@ -512,19 +512,19 @@ __global__ void _catzilla_matmul_v6(int M, int N, int K, float alpha,
   // make sure inner block looks like this, to ensure coalescing
   auto per_block_data_shape = Coord(Y_THREAD, X_THREAD);
 
-  Matrix lhs_mat = Matrix(lhs, lhs_shape);
-  Matrix rhs_mat = Matrix(rhs, rhs_shape);
-  Matrix out_mat = Matrix(out, out_shape);
+  Matrix<float> lhs_mat = Matrix<float>(lhs, lhs_shape);
+  Matrix<float> rhs_mat = Matrix<float>(rhs, rhs_shape);
+  Matrix<float> out_mat = Matrix<float>(out, out_shape);
 
   // __shared__ float lhs_shared[M_TILE* (K_TILE+1)];
 
-  Matrix lhs_shared_mat = make_shared<M_TILE, K_TILE + 1>();
-  Matrix rhs_shared_mat = make_shared<K_TILE, N_TILE + 1>();
-  // Matrix out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
+  Matrix<float> lhs_shared_mat = make_shared<M_TILE, K_TILE + 1, float>();
+  Matrix<float> rhs_shared_mat = make_shared<K_TILE, N_TILE + 1, float>();
+  // Matrix<float> out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
   //
 
-  Matrix partial_sum
-    = make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD)>();
+  Matrix<float> partial_sum = make_local<CEIL_DIV(M_TILE, Y_THREAD),
+                                         CEIL_DIV(N_TILE, X_THREAD), float>();
 
   // int threadId = threadIdx.y * X_THREAD + threadIdx.x;
 

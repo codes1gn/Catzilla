@@ -27,29 +27,33 @@ _catzilla_matmul_wmma_basic_test(int M, int N, int K, float alpha, float *lhs,
 
   // make sure inner block looks like this, to ensure coalescing
 
-  Matrix lhs_mat = Matrix(lhs, lhs_shape);
-  Matrix rhs_mat = Matrix(rhs, rhs_shape);
-  Matrix out_mat = Matrix(out, out_shape);
+  Matrix<float> lhs_mat = Matrix<float>(lhs, lhs_shape);
+  Matrix<float> rhs_mat = Matrix<float>(rhs, rhs_shape);
+  Matrix<float> out_mat = Matrix<float>(out, out_shape);
 
   __shared__ half lhs_shared[M_TILE * K_TILE];
   __shared__ half rhs_shared[K_TILE * N_TILE];
-  __shared__ float out_shared[M_TILE * N_TILE];
+  // __shared__ float out_shared[M_TILE * N_TILE];
 
-  MatrixH lhs_shared_mat = MatrixH(lhs_shared, lhs_sm_tile_shape);
-  MatrixH rhs_shared_mat = MatrixH(rhs_shared, rhs_sm_tile_shape);
-  Matrix out_shared_mat = Matrix(out_shared, out_sm_tile_shape);
+  Matrix<half> lhs_shared_mat = Matrix<half>(lhs_shared, lhs_sm_tile_shape);
+  Matrix<half> rhs_shared_mat = Matrix<half>(rhs_shared, rhs_sm_tile_shape);
+  // MAKE_SHARED(rhs_shared_mat, K_TILE, N_TILE, half);
+  // Matrix<float> out_shared_mat = Matrix<float>(out_shared,
+  // out_sm_tile_shape);
+  MAKE_SHARED(out_shared_mat, M_TILE, N_TILE, float);
+
   out_shared_mat.fill(0.);
 
   // TODO: wrong, since this will release shared after make_shared call
   // impl a Macro based make_shared and make_local, ensure it won't release
   //
-  // Matrix lhs_shared_mat = make_shared<M_TILE, K_TILE>();
-  // Matrix rhs_shared_mat = make_shared<K_TILE, N_TILE>();
-  // Matrix out_shared_mat = make_shared<M_TILE, N_TILE>(); // 16*16*4 = 1024
-  // Bytes
+  // Matrix<half> lhs_shared_mat = make_shared<M_TILE, K_TILE, half>();
+  // Matrix<half> rhs_shared_mat = make_shared<K_TILE, N_TILE, half>();
+  // Matrix<float> out_shared_mat = make_shared<M_TILE, N_TILE>(); // 16*16*4 =
+  // 1024 Bytes
   //
 
-  // Matrix partial_sum
+  // Matrix<float> partial_sum
   //   = make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD)>();
 
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
@@ -75,10 +79,7 @@ _catzilla_matmul_wmma_basic_test(int M, int N, int K, float alpha, float *lhs,
 
     // contract at 128x128x32 micro-kernel
     // matmul_kernel_16x16x16_thread_32(lhs_shared_mat, rhs_shared_mat,
-    // out_shared_mat.data); identity<M_TILE, N_TILE>(lhs_shared_mat,
-    // out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape));
-    // identity<M_TILE, N_TILE>(lhs_shared_mat,
-    // out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape));
+    //                                  out_shared_mat.data);
     matmul_kernel_m16n16k16(lhs_shared_mat.data, rhs_shared_mat.data,
                             out_shared_mat.data);
   }

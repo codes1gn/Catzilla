@@ -32,19 +32,19 @@ __global__ void _catzilla_matmul_flatten_copy(int M, int N, int K, float alpha,
 
   // make sure inner block looks like this, to ensure coalescing
 
-  Matrix lhs_mat = Matrix(lhs, lhs_shape);
-  Matrix rhs_mat = Matrix(rhs, rhs_shape);
-  Matrix out_mat = Matrix(out, out_shape);
+  Matrix<float> lhs_mat = Matrix<float>(lhs, lhs_shape);
+  Matrix<float> rhs_mat = Matrix<float>(rhs, rhs_shape);
+  Matrix<float> out_mat = Matrix<float>(out, out_shape);
 
   // __shared__ float lhs_shared[M_TILE* (K_TILE+1)];
 
-  Matrix lhs_shared_mat = make_shared<M_TILE, K_TILE>();
-  Matrix rhs_shared_mat = make_shared<K_TILE, N_TILE>();
-  // Matrix out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
+  Matrix<float> lhs_shared_mat = make_shared<M_TILE, K_TILE, float>();
+  Matrix<float> rhs_shared_mat = make_shared<K_TILE, N_TILE, float>();
+  // Matrix<float> out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
   //
 
-  Matrix partial_sum
-    = make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD)>();
+  Matrix<float> partial_sum = make_local<CEIL_DIV(M_TILE, Y_THREAD),
+                                         CEIL_DIV(N_TILE, X_THREAD), float>();
 
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
     for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
