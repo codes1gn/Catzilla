@@ -13,14 +13,15 @@
 using namespace nvcuda;
 using namespace nvcuda::wmma;
 
-// C += A * B
-// m16.n16.k16
-// f16.f16.f32
-// row-major, col-major, row-major
-// inline __device__ void matmul_kernel_m16n16k8_tf32(float *a, float *b,
+// // C += A * B
+// // m16.n16.k16
+// // f16.f16.f32
+// // row-major, col-major, row-major
+// inline __device__ void mma_m16n16k8_tf32_f32_ptx(float *a, float *b,
 //                                                    float *c)
 // {
 //   // Declare the fragments
+//   // TODO: incomplete error, does not know why yet?
 //   wmma::fragment<wmma::matrix_a, 16, 16, 8, float, wmma::row_major> a_frag;
 //   wmma::fragment<wmma::matrix_b, 16, 16, 8, float, wmma::row_major> b_frag;
 //   wmma::fragment<wmma::accumulator, 16, 16, 8, float> c_frag;
@@ -33,7 +34,7 @@ using namespace nvcuda::wmma;
 //
 //   // Assuming leading dimension is 16
 //   wmma::load_matrix_sync(a_frag, a, 16);
-//   wmma::load_matrix_sync(b_frag, b, 8);
+//   wmma::load_matrix_sync(b_frag, b, 16);
 //   wmma::load_matrix_sync(c_frag, c, 16, wmma::mem_row_major);
 //
 //   // NOTE: strangely, wmma::fragment has half as basetype, but the datastruct
@@ -44,27 +45,28 @@ using namespace nvcuda::wmma;
 //   // uint32_t const *B_frag = reinterpret_cast<uint32_t const *>(b_frag.x);
 //
 //   // Perform the matrix multiplication
-//   // wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
-//   asm volatile("wmma.mma.sync.aligned.m16n16k8.row.col.f32.tf32.tf32.f32 \t"
-//                "{%0, %1, %2, %3, %4, %5, %6, %7}, \t"
-//                "{%8, %9, %10, %11}, {%12, %13, %14, %15}, \t"
-//                "{%16, %17, %18, %19, %20, %21, %22, %23};"
-//                : "=f"(c_frag.x[0]), "=f"(c_frag.x[1]), "=f"(c_frag.x[2]),
-//                  "=f"(c_frag.x[3]), "=f"(c_frag.x[4]), "=f"(c_frag.x[5]),
-//                  "=f"(c_frag.x[6]), "=f"(c_frag.x[7])
-//                : "f"(a_frag.x[0]), "f"(a_frag.x[1]), "f"(a_frag.x[2]),
-//                "f"(a_frag.x[3]),
-//                  "f"(b_frag.x[0]), "f"(b_frag.x[1]), "f"(b_frag.x[2]),
-//                  "f"(b_frag.x[3]), "f"(c_frag.x[0]), "f"(c_frag.x[1]),
-//                  "f"(c_frag.x[2]), "f"(c_frag.x[3]), "f"(c_frag.x[4]),
-//                  "f"(c_frag.x[5]), "f"(c_frag.x[6]), "f"(c_frag.x[7]));
+//   wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+//   // asm volatile("wmma.mma.sync.aligned.m16n16k8.row.col.f32.tf32.tf32.f32
+//   \t"
+//   //              "{%0, %1, %2, %3, %4, %5, %6, %7}, \t"
+//   //              "{%8, %9, %10, %11}, {%12, %13, %14, %15}, \t"
+//   //              "{%16, %17, %18, %19, %20, %21, %22, %23};"
+//   //              : "=f"(c_frag.x[0]), "=f"(c_frag.x[1]), "=f"(c_frag.x[2]),
+//   //                "=f"(c_frag.x[3]), "=f"(c_frag.x[4]), "=f"(c_frag.x[5]),
+//   //                "=f"(c_frag.x[6]), "=f"(c_frag.x[7])
+//   //              : "f"(a_frag.x[0]), "f"(a_frag.x[1]), "f"(a_frag.x[2]),
+//   //              "f"(a_frag.x[3]),
+//   //                "f"(b_frag.x[0]), "f"(b_frag.x[1]), "f"(b_frag.x[2]),
+//   //                "f"(b_frag.x[3]), "f"(c_frag.x[0]), "f"(c_frag.x[1]),
+//   //                "f"(c_frag.x[2]), "f"(c_frag.x[3]), "f"(c_frag.x[4]),
+//   //                "f"(c_frag.x[5]), "f"(c_frag.x[6]), "f"(c_frag.x[7]));
 //
 //   // Store the result
 //   wmma::store_matrix_sync(c, c_frag, 16, wmma::mem_row_major);
 // }
 
-inline __device__ void matmul_kernel_m16n16k16_ptx(half *a_half, half *b_half,
-                                                   float *c)
+inline __device__ void mma_m16n16k16_f16_f32_ptx(half *a_half, half *b_half,
+                                                 float *c)
 {
   // Declare the fragments
   wmma::fragment<wmma::matrix_a, 16, 16, 16, half, wmma::row_major> a_frag;
@@ -79,6 +81,12 @@ inline __device__ void matmul_kernel_m16n16k16_ptx(half *a_half, half *b_half,
 
   // Assuming leading dimension is 16
   wmma::load_matrix_sync(a_frag, a_half, 16);
+  // asm volatile("wmma.load.a.sync.aligned.m16n16k16.global.row.f16 \t"
+  //              "{%0, %1, %2, %3, %4, %5, %6, %7}, [%8]\t"
+  //              : "=r"(A_frag[0]), "=r"(A_frag[1]), "=r"(A_frag[2]),
+  //                "=r"(A_frag[3]), "=r"(A_frag[4]), "=r"(A_frag[5]),
+  //                "=r"(A_frag[6]), "=r"(A_frag[7])
+  //              : "h"(a_half[0]));
   wmma::load_matrix_sync(b_frag, b_half, 16);
   wmma::load_matrix_sync(c_frag, c, 16, wmma::mem_row_major);
 
