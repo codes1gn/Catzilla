@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "benchmark_utils.h"
 #include "kernel_impls.h"
-#include "benchmark_utils.h" 
 
 #define cudaCheck(err) (cudaCheck(err, __FILE__, __LINE__))
 
@@ -99,11 +99,11 @@ int main(int argc, char **argv) {
   // randomise(A, M * K);
   // randomise(B, K * N);
 
-  ranges(A, M * K);
-  ranges(B, K * N);
+  // ranges(A, M * K);
+  // ranges(B, K * N);
 
-  // ones(A, M * K);
-  // ones(B, K * N);
+  ones(A, M * K);
+  ones(B, K * N);
 
   cudaCheck(cudaMalloc((void **)&dA, sizeof(float) * M * K));
   cudaCheck(cudaMalloc((void **)&dB, sizeof(float) * K * N));
@@ -124,10 +124,11 @@ int main(int argc, char **argv) {
   if (kernel_id != 0 && isProf < 1) {
     std::cout << "Verify Results\n";
     run_reference(M, N, K, alpha, dA, dB, beta, dC_ref,
-               handle); // cuBLAS
+                  handle); // cuBLAS
     // use catz::matmul_exec
-    catz::recipes::matmul_exec(kernel_id, M, N, K, alpha, dA, dB, beta,
-                         dC); // Executes the kernel, modifies the result matrix
+    catz::recipes::matmul_exec(
+        kernel_id, M, N, K, alpha, dA, dB, beta,
+        dC); // Executes the kernel, modifies the result matrix
     cudaCheck(cudaDeviceSynchronize());
     cudaCheck(cudaGetLastError()); // Check for async errors during kernel run
     cudaMemcpy(C, dC, sizeof(float) * M * N, cudaMemcpyDeviceToHost);
@@ -157,8 +158,9 @@ int main(int argc, char **argv) {
   cudaEventRecord(beg);
   for (int j = 0; j < repeat; j++) {
     // We don't reset dC between runs to save time
-    catz::recipes::matmul_exec(kernel_id, M, N, K, alpha, dA, dB, beta,
-                         dC); // Executes the kernel, modifies the result matrix
+    catz::recipes::matmul_exec(
+        kernel_id, M, N, K, alpha, dA, dB, beta,
+        dC); // Executes the kernel, modifies the result matrix
   }
   cudaEventRecord(end);
   cudaEventSynchronize(beg);

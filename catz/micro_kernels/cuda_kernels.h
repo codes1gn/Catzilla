@@ -27,6 +27,18 @@ inline __device__ void matmul_kernel_32x32x32(float *lhs, float *rhs,
   return;
 }
 
+inline __device__ void
+matmul_kernel_16x16x16_thread_16x16(float *lhs, float *rhs, float *out)
+{
+  int tid_x = threadIdx.x;
+  int tid_y = threadIdx.y;
+  for (int i = 0; i < 16; i++) {
+    out[tid_y * 16 + tid_x] += lhs[tid_y * 16 + i] * rhs[i * 16 + tid_x];
+  }
+  __syncthreads();
+  return;
+}
+
 inline __device__ void matmul_kernel_16x16x16_thread_32(Matrix<float> lhs,
                                                         Matrix<float> rhs,
                                                         float *out_shared)

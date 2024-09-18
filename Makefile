@@ -105,8 +105,17 @@ bench: build
 dev: build 
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 16 -size-n 16 -size-k 16
 
-runby: build 
+dev2: build 
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 32 -size-n 32 -size-k 32
+
+dev3: build 
+	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 64 -size-n 64 -size-k 64
+
+dev4: build 
+	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 128 -size-n 128 -size-k 128
+
+dev5: build 
+	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 256 -size-n 256 -size-k 256
 
 format:
 	@cd $(BUILD_DIR) && ninja format-code
