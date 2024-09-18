@@ -80,26 +80,26 @@ __global__ void _matmul_dist_to_thread(int M, int N, int K, float alpha,
     __syncthreads();
 
     // contract at 128x128x32 micro-kernel
-    // matmul_kernel_coalesced<M_TILE, N_TILE, K_TILE, Y_THREAD, X_THREAD>(
-    //   lhs_shared_mat.data, rhs_shared_mat.data, partial_sum.data);
-    identity<16, 16>(
-      rhs_shared_mat,
-      out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape));
+    matmul_kernel_coalesced<M_TILE, N_TILE, K_TILE, Y_THREAD, X_THREAD>(
+      lhs_shared_mat.data, rhs_shared_mat.data, partial_sum.data);
+    // identity<16, 16>(
+    //   rhs_shared_mat,
+    //   out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape));
   }
   __syncthreads();
 
-  //   for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
-  // #pragma unroll
-  //     for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-  //       // out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-  //       //   .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
-  //       //   <= partial_sum;
-  //       out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-  //         .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
-  //         .dist_to_thread()
-  //         = partial_sum.dist_ex(Coord(m, n));
-  //     }
-  //   }
+  for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
+#pragma unroll
+    for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
+      // out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+      //   .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
+      //   <= partial_sum;
+      out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+        .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
+        .dist_to_thread()
+        = partial_sum.dist_ex(Coord(m, n));
+    }
+  }
 }
 
 void matmul_dist_to_thread(int M, int N, int K, float alpha, float *A, float *B,
