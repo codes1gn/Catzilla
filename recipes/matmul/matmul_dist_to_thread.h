@@ -1,5 +1,5 @@
-#ifndef CATZILLA_RECIPES_KERNELS_MATMUL_FLATTEN_COPY_H_
-#define CATZILLA_RECIPES_KERNELS_MATMUL_FLATTEN_COPY_H_
+#ifndef CATZILLA_RECIPES_MATMUL_DIST_TO_THREAD_H_
+#define CATZILLA_RECIPES_MATMUL_DIST_TO_THREAD_H_
 
 #include <cassert>
 #include <cstdio>
@@ -11,12 +11,20 @@
 #include "macros.h"
 #include "micro_kernels.h"
 
+using namespace catz;
+using namespace catz::cuda;
+using namespace catz::wmma;
+using namespace catz::mma;
+
+namespace catz::recipes
+{
+
 template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
           const int N_REG, const int K_REG, const int X_THREAD,
           const int Y_THREAD>
-__global__ void _catzilla_matmul_flatten_copy(int M, int N, int K, float alpha,
-                                              float *lhs, float *rhs,
-                                              float beta, float *out)
+__global__ void _matmul_dist_to_thread(int M, int N, int K, float alpha,
+                                       float *lhs, float *rhs, float beta,
+                                       float *out)
 {
   auto lhs_shape = make_coord(M, K);
   auto rhs_shape = make_coord(K, N);
@@ -94,8 +102,8 @@ __global__ void _catzilla_matmul_flatten_copy(int M, int N, int K, float alpha,
   //   }
 }
 
-void catzilla_matmul_flatten_copy(int M, int N, int K, float alpha, float *A,
-                                  float *B, float beta, float *C)
+void matmul_dist_to_thread(int M, int N, int K, float alpha, float *A, float *B,
+                           float beta, float *C)
 {
   const int M_TILE = 128;
   const int K_TILE = 32;
@@ -110,13 +118,12 @@ void catzilla_matmul_flatten_copy(int M, int N, int K, float alpha, float *A,
 
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(X_THREAD, Y_THREAD);
-  cudaFuncSetAttribute(
-    _catzilla_matmul_flatten_copy<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG,
-                                  X_THREAD, Y_THREAD>,
-    cudaFuncAttributePreferredSharedMemoryCarveout,
-    cudaSharedmemCarveoutMaxShared);
-  _catzilla_matmul_flatten_copy<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG,
-                                X_THREAD, Y_THREAD>
+  cudaFuncSetAttribute(_matmul_dist_to_thread<M_TILE, N_TILE, K_TILE, M_REG,
+                                              N_REG, K_REG, X_THREAD, Y_THREAD>,
+                       cudaFuncAttributePreferredSharedMemoryCarveout,
+                       cudaSharedmemCarveoutMaxShared);
+  _matmul_dist_to_thread<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, X_THREAD,
+                         Y_THREAD>
     <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 
   // const int M_TILE = 16;
@@ -133,15 +140,17 @@ void catzilla_matmul_flatten_copy(int M, int N, int K, float alpha, float *A,
   // dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   // dim3 blockDim(X_THREAD, Y_THREAD);
   // cudaFuncSetAttribute(
-  //   _catzilla_matmul_flatten_copy<M_TILE, N_TILE, K_TILE, M_REG, N_REG,
+  //   _matmul_dist_to_thread<M_TILE, N_TILE, K_TILE, M_REG, N_REG,
   //   K_REG,
   //                                 X_THREAD, Y_THREAD>,
   //   cudaFuncAttributePreferredSharedMemoryCarveout,
   //   cudaSharedmemCarveoutMaxShared);
-  // _catzilla_matmul_flatten_copy<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG,
+  // _matmul_dist_to_thread<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG,
   //                               X_THREAD, Y_THREAD>
   //   <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
   return;
 }
 
-#endif // CATZILLA_RECIPES_KERNELS_MATMUL_FLATTEN_COPY_H_
+} // namespace catz::recipes
+
+#endif // CATZILLA_RECIPES_MATMUL_DIST_TO_THREAD_H_

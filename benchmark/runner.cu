@@ -3,17 +3,16 @@
 #include <ctime>
 #include <fstream>
 #include <iostream>
-#include <runner.h>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "kernel_impls.h"
-// TODO, promote this main and baselines/utils to top-level
+#include "benchmark_utils.h" 
 
 #define cudaCheck(err) (cudaCheck(err, __FILE__, __LINE__))
 
-const std::string errLogFile = "matrixValidationFailure.txt";
+const std::string errLogFile = "matrixValidationFailure.log";
 
 struct Arguments {
   int SIZE_M = 4096;
@@ -97,11 +96,11 @@ int main(int argc, char **argv) {
   C = (float *)malloc(sizeof(float) * M * N);
   C_ref = (float *)malloc(sizeof(float) * M * N);
 
-  randomise(A, M * K);
-  randomise(B, K * N);
+  // randomise(A, M * K);
+  // randomise(B, K * N);
 
-  // ranges(A, M * K);
-  // ranges(B, K * N);
+  ranges(A, M * K);
+  ranges(B, K * N);
 
   // ones(A, M * K);
   // ones(B, K * N);
@@ -124,9 +123,10 @@ int main(int argc, char **argv) {
   // kernel function timing to avoid cold start errors
   if (kernel_id != 0 && isProf < 1) {
     std::cout << "Verify Results\n";
-    run_kernel(0, M, N, K, alpha, dA, dB, beta, dC_ref,
+    run_reference(M, N, K, alpha, dA, dB, beta, dC_ref,
                handle); // cuBLAS
-    catzilla_matmul_exec(kernel_id, M, N, K, alpha, dA, dB, beta,
+    // use catz::matmul_exec
+    catz::recipes::matmul_exec(kernel_id, M, N, K, alpha, dA, dB, beta,
                          dC); // Executes the kernel, modifies the result matrix
     cudaCheck(cudaDeviceSynchronize());
     cudaCheck(cudaGetLastError()); // Check for async errors during kernel run
@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
   cudaEventRecord(beg);
   for (int j = 0; j < repeat; j++) {
     // We don't reset dC between runs to save time
-    catzilla_matmul_exec(kernel_id, M, N, K, alpha, dA, dB, beta,
+    catz::recipes::matmul_exec(kernel_id, M, N, K, alpha, dA, dB, beta,
                          dC); // Executes the kernel, modifies the result matrix
   }
   cudaEventRecord(end);

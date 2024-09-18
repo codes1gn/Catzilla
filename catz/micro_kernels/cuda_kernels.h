@@ -10,10 +10,11 @@
 
 #include "index_utils.h"
 
-using namespace nvcuda;
-using namespace nvcuda::wmma;
+using namespace catz;
 
-// TODO: move
+namespace catz::cuda
+{
+
 inline __device__ void matmul_kernel_32x32x32(float *lhs, float *rhs,
                                               float &out)
 {
@@ -251,5 +252,7 @@ inline __device__ void identity(Matrix<float> inp, Matrix<float> out)
   __syncthreads();
   return;
 }
+
+} // namespace catz::cuda
 
 #endif // CATZILLA_RECIPES_UTILS_MICRO_KERNELS_RAW_KERNELS_H_

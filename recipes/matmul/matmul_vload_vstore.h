@@ -1,5 +1,5 @@
-#ifndef CATZILLA_RECIPES_KERNELS_MATMUL_VLOAD_VSTORE_H_
-#define CATZILLA_RECIPES_KERNELS_MATMUL_VLOAD_VSTORE_H_
+#ifndef CATZILLA_RECIPES_MATMUL_VLOAD_VSTORE_H_
+#define CATZILLA_RECIPES_MATMUL_VLOAD_VSTORE_H_
 
 #include <cassert>
 #include <cstdio>
@@ -10,6 +10,14 @@
 #include "index_utils.h"
 #include "macros.h"
 #include "micro_kernels.h"
+
+using namespace catz;
+using namespace catz::cuda;
+using namespace catz::wmma;
+using namespace catz::mma;
+
+namespace catz::recipes
+{
 
 // TODO: about code
 // move lhs and rhs tests to identity
@@ -28,9 +36,9 @@
 template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
           const int N_REG, const int K_REG, const int X_THREAD,
           const int Y_THREAD>
-__global__ void _catzilla_matmul_vload_vstore(int M, int N, int K, float alpha,
-                                              float *lhs, float *rhs,
-                                              float beta, float *out)
+__global__ void _matmul_vload_vstore(int M, int N, int K, float alpha,
+                                     float *lhs, float *rhs, float beta,
+                                     float *out)
 {
   auto lhs_shape = make_coord(M, K); // 16x4
   auto rhs_shape = make_coord(K, N);
@@ -133,8 +141,8 @@ __global__ void _catzilla_matmul_vload_vstore(int M, int N, int K, float alpha,
 
 // TODO: what if K_TILE < X_THREAD OR Y_THREAD, a thread-var cannot bind to
 // K_TILE dim solely XOR-SWIZZLE
-void catzilla_matmul_vload_vstore(int M, int N, int K, float alpha, float *A,
-                                  float *B, float beta, float *C)
+void matmul_vload_vstore(int M, int N, int K, float alpha, float *A, float *B,
+                         float beta, float *C)
 {
   const int M_TILE = 128;
   const int K_TILE = 32;
@@ -149,49 +157,16 @@ void catzilla_matmul_vload_vstore(int M, int N, int K, float alpha, float *A,
 
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(X_THREAD, Y_THREAD);
-  cudaFuncSetAttribute(
-    _catzilla_matmul_vload_vstore<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG,
-                                  X_THREAD, Y_THREAD>,
-    cudaFuncAttributePreferredSharedMemoryCarveout,
-    cudaSharedmemCarveoutMaxShared);
-  _catzilla_matmul_vload_vstore<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG,
-                                X_THREAD, Y_THREAD>
+  cudaFuncSetAttribute(_matmul_vload_vstore<M_TILE, N_TILE, K_TILE, M_REG,
+                                            N_REG, K_REG, X_THREAD, Y_THREAD>,
+                       cudaFuncAttributePreferredSharedMemoryCarveout,
+                       cudaSharedmemCarveoutMaxShared);
+  _matmul_vload_vstore<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, X_THREAD,
+                       Y_THREAD>
     <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-  //
-  // const int M_TILE = 16;
-  // const int K_TILE = 8;
-  // const int N_TILE = 16;
-  // const int M_REG = 8;
-  // const int K_REG = 8;
-  // const int N_REG = 8;
-  // const int X_THREAD = 2; // if only lhs use float4, threads volume can be
-  // 1/4 of M/K-REG, but other place cannot match; thus we have to solve
-  // elements = K*threads where K = 2, 3, 4 const int Y_THREAD = 8; assert(M_REG
-  // * K_REG > X_THREAD * Y_THREAD); assert(N_REG * K_REG > X_THREAD *
-  // Y_THREAD);
-  //
-  // dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
-  // dim3 blockDim(X_THREAD, Y_THREAD);
-  // // cudaFuncSetAttribute(
-  // //   _catzilla_matmul_vload_vstore_test_lhs<M_TILE, N_TILE, K_TILE, M_REG,
-  // N_REG, K_REG,
-  // //                                 X_THREAD, Y_THREAD>,
-  // //   cudaFuncAttributePreferredSharedMemoryCarveout,
-  // //   cudaSharedmemCarveoutMaxShared);
-  // // _catzilla_matmul_vload_vstore_test_lhs<M_TILE, N_TILE, K_TILE, M_REG,
-  // N_REG, K_REG,
-  // //                               X_THREAD, Y_THREAD>
-  // //   <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-  //
-  // // _catzilla_matmul_vload_vstore_test_rhs<M_TILE, N_TILE, K_TILE, M_REG,
-  // N_REG, K_REG,
-  // //                               X_THREAD, Y_THREAD>
-  // //   <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
-  //
-  // _catzilla_matmul_vload_vstore<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG,
-  //                               X_THREAD, Y_THREAD>
-  //   <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
   return;
 }
+
+} // namespace catz::recipes
 
 #endif // CATZILLA_RECIPES_KERNELS_MATMUL_VLOAD_VSTORE_H_

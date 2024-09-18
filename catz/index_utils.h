@@ -14,9 +14,13 @@
 #include <tuple>
 #include <type_traits>
 
+namespace catz
+{
+
 template <typename T>
 struct is_allowed_type
     : std::disjunction<std::is_same<T, float>, std::is_same<T, half>,
+                       std::is_same<T, __nv_bfloat16>,
                        std::is_same<T, float4>> {
 };
 
@@ -320,5 +324,7 @@ __device__ __forceinline__ int xor_swizzle(int o)
 {
   return (o ^ ((o & (7 << 5)) >> 3));
 }
+
+} // namespace catz
 
 #endif // CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_

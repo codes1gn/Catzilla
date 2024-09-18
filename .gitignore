@@ -1,4 +1,4 @@
 __*__/
 build/
-*.txt
+*.log
 .cache/

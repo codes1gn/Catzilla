@@ -1,34 +1,52 @@
-#ifndef CATZILLA_RECIPES_matmul_KERNELS_IMPORTER_H_
-#define CATZILLA_RECIPES_matmul_KERNELS_IMPORTER_H_
+#ifndef CATZILLA_RECIPES_KERNELS_IMPORTER_H_
+#define CATZILLA_RECIPES_KERNELS_IMPORTER_H_
 
-#include "kernels/matmul.h"
-#include "kernels/matmul_flatten_copy.h"
-#include "kernels/matmul_vload_vstore.h"
-#include "kernels/matmul_wmma_base.h"
+#include "matmul/matmul_dist_to_thread.h"
+#include "matmul/matmul_outerproduct.h"
+#include "matmul/matmul_padswizzled.h"
+#include "matmul/matmul_refactored.h"
+#include "matmul/matmul_tensor_cores.h"
+#include "matmul/matmul_vanilla.h"
+#include "matmul/matmul_vload_vstore.h"
 
-inline void catzilla_matmul_exec(int impl_idx, int M, int N, int K, float alpha,
-                                 float *A, float *B, float beta, float *C)
+namespace catz::recipes
+{
+
+// TODO: use catz::recipes namespace
+inline void matmul_exec(int impl_idx, int M, int N, int K, float alpha,
+                        float *A, float *B, float beta, float *C)
 {
   if (impl_idx == 1) {
-    catzilla_matmul_v1(M, N, K, alpha, A, B, beta, C);
+    matmul_f16f32(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 2) {
-    catzilla_matmul_v2(M, N, K, alpha, A, B, beta, C);
+    matmul_outerproduct(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 3) {
-    catzilla_matmul_v3(M, N, K, alpha, A, B, beta, C);
+    matmul_affine_api(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 4) {
-    catzilla_matmul_v4(M, N, K, alpha, A, B, beta, C);
+    matmul_stream_api(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 5) {
-    catzilla_matmul_v5(M, N, K, alpha, A, B, beta, C);
+    matmul_stream_api_tuned(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 6) {
-    catzilla_matmul_v6(M, N, K, alpha, A, B, beta, C);
+    matmul_pad_swizzled(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 7) {
-    catzilla_matmul_flatten_copy(M, N, K, alpha, A, B, beta, C);
+    matmul_dist_to_thread(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 8) {
-    catzilla_matmul_vload_vstore(M, N, K, alpha, A, B, beta, C);
+    matmul_vload_vstore(M, N, K, alpha, A, B, beta, C);
+  } else if (impl_idx == 9) {
+    // wmma.mma.sync.aligned.m16n16k16.row.col.f32.f32
+    matmul_tensor_cores_wmma_f16f32(M, N, K, alpha, A, B, beta, C);
+  } else if (impl_idx == 10) {
+    // mma.sync.aligned.m16n16k8.row.col.f32.f16.f16.f32
+    matmul_tensor_cores_mma_f16f32(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 11) {
-    // use wmma.mma.sync.m16.n16.k16
-    catzilla_matmul_wmma_basic_test(M, N, K, alpha, A, B, beta, C);
+    // mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32
+    matmul_tensor_cores_mma_tf32f32(M, N, K, alpha, A, B, beta, C);
+  } else {
+    printf("[ERROR] kernel id not exists\n");
+    exit(EXIT_FAILURE);
   }
 }
 
-#endif // CATZILLA_RECIPES_matmul_KERNELS_IMPORTER_H_
+} // namespace catz::recipes
+
+#endif // CATZILLA_RECIPES_KERNELS_IMPORTER_H_

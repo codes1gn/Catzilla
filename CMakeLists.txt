@@ -35,6 +35,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 # Configure header file search paths
 include_directories(${CUDA_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/catz)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/recipes)
 
 # Configure the source file path to be compiled
 add_subdirectory(${PROJECT_SOURCE_DIR}/references)
@@ -42,6 +43,7 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/references)
 # Catzilla impls on various operators
 add_subdirectory(${PROJECT_SOURCE_DIR}/catz)
 add_subdirectory(${PROJECT_SOURCE_DIR}/recipes)
+add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark)
 
 # ==============================================================
 # ==   house-keeping code
