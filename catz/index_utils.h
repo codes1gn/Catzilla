@@ -266,11 +266,21 @@ template <typename T> struct Matrix {
     *data = other_scalar;
   }
 
+  // TODO: merge generics
+  // half <= float
   template <typename U = T>
   __device__ typename std::enable_if<std::is_same<U, half>::value, void>::type
   operator=(const Matrix<float> &other)
   {
     *data = __float2half(*other.data);
+  }
+
+  // float <= half
+  template <typename U = T>
+  __device__ typename std::enable_if<std::is_same<U, float>::value, void>::type
+  operator=(const Matrix<half> &other)
+  {
+    *data = __half2float(*other.data);
   }
 
   template <typename U = T>

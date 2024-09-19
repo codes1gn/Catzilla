@@ -39,6 +39,41 @@ matmul_kernel_16x16x16_thread_16x16(float *lhs, float *rhs, float *out)
   return;
 }
 
+inline __device__ void cuda_m16n8k16_f16f32(float *out_shared, const half *lhs,
+                                            const half *rhs, const float *bias)
+{
+  int row_offset = 2 * (threadIdx.x / 4);
+  int col_offset = 2 * (threadIdx.x % 4);
+
+  for (int row = row_offset; row < row_offset + 2; row++) {
+    for (int col = col_offset; col < col_offset + 2; col++) {
+      for (int k = 0; k < 16; k++) {
+        out_shared[row * 8 + col]
+          = __half2float(lhs[row * 16 + k] * rhs[k * 8 + col])
+            + bias[row * 8 + col];
+      }
+    }
+  }
+  return;
+}
+
+inline __device__ void cuda_m16n8k16_f16f32(float *out_shared, const float *lhs,
+                                            const float *rhs, const float *bias)
+{
+  int row_offset = threadIdx.x / 4;
+  int col_offset = threadIdx.x % 4;
+
+  for (int row = row_offset; row < row_offset + 2; row++) {
+    for (int col = col_offset; col < col_offset + 2; col++) {
+      for (int k = 0; k < 16; k++) {
+        out_shared[row * 8 + col]
+          = lhs[row * 16 + k] * rhs[k * 8 + col] + bias[row * 8 + col];
+      }
+    }
+  }
+  return;
+}
+
 inline __device__ void matmul_kernel_16x16x16_thread_32(Matrix<float> lhs,
                                                         Matrix<float> rhs,
                                                         float *out_shared)
@@ -251,8 +286,23 @@ inline __device__ void matmul_kernel_pad_swizzled(float *lhs, float *rhs,
 }
 
 // first kernel use Matrix<float> as type
+// TODO: merge generics
 template <const int M, const int N>
 inline __device__ void identity(Matrix<float> inp, Matrix<float> out)
+{
+  int THREADS = blockDim.x * blockDim.y;
+  int ELEMENTS = M * N;
+  int CHUNKS = CEIL_DIV(ELEMENTS, THREADS);
+  int ROWPERCK = CEIL_DIV(THREADS, N);
+  for (int ck = 0; ck < CHUNKS; ck++)
+    out.tile_ex(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread()
+      = inp.tile_ex(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread();
+  __syncthreads();
+  return;
+}
+
+template <const int M, const int N>
+inline __device__ void identity(Matrix<half> inp, Matrix<float> out)
 {
   int THREADS = blockDim.x * blockDim.y;
   int ELEMENTS = M * N;
