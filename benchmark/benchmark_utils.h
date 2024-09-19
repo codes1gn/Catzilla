@@ -15,6 +15,7 @@ void cudaCheck(cudaError_t error, const char *file,
 void CudaDeviceInfo();    // print CUDA information
 
 void ranges(float *mat, int N);
+void ranges(float *mat, int N, int mod);
 void randomise(float *mat, int N);
 void zeros(float *mat, int N);
 void ones(float *mat, int N);
@@ -25,7 +26,7 @@ bool verify_matrix(float *mat1, float *mat2, int N);
 float get_current_sec();                        // Get the current moment
 float cpu_elapsed_time(float &beg, float &end); // Calculate time difference
 
-void run_reference(int M, int N, int K, float alpha, float *A,
-                float *B, float beta, float *C, cublasHandle_t handle);
+void run_reference(int M, int N, int K, float alpha, float *A, float *B,
+                   float beta, float *C, cublasHandle_t handle);
 
 #endif // CATZILLA_RECIPES_SGEMM_RUNNER_H_

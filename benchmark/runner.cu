@@ -99,11 +99,11 @@ int main(int argc, char **argv) {
   // randomise(A, M * K);
   // randomise(B, K * N);
 
-  // ranges(A, M * K);
-  // ranges(B, K * N);
+  // ranges(A, M * K, 256);
+  ranges(B, K * N, 256);
 
   ones(A, M * K);
-  ones(B, K * N);
+  // ones(B, K * N);
 
   cudaCheck(cudaMalloc((void **)&dA, sizeof(float) * M * K));
   cudaCheck(cudaMalloc((void **)&dB, sizeof(float) * K * N));

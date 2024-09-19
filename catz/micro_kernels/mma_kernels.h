@@ -49,25 +49,51 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
   int row_a = group_id;        // 0, 1, 4, 5
   int row_a_ex = group_id + 8; // 2, 3, 6, 7
 
-  int col_a = thread_in_group;        // 0, 1, 2, 3
-  int col_a_ex = thread_in_group + 4; // 4, 5, 6, 7
+  int col_a = 2 * thread_in_group;        // 0, 1, 2, 3
+  int col_a_ex = 2 * thread_in_group + 8; // 4, 5, 6, 7
   //
   int row_b = thread_in_group;        // i < 2
   int row_b_ex = thread_in_group + 4; // i >= 2
   //
   int col_b = group_id;
 
+  int row_c = group_id; // i < 2
+  int row_c_ex = group_id + 8;
+  int col_c = thread_in_group * 2; // each thread takes f32x2 contiguous mem
+
   unsigned A[4];
   unsigned B[2];
   float C[4];
   float D[4];
 
-  initialize_unsigned_half(A, 4, __float2half(1.0f));
-  initialize_unsigned_half(B, 2, __float2half(0.0f));
+  // initialize_unsigned_half(A, 4, __float2half(0.0f));
+  // initialize_unsigned_half(B, 2, __float2half(1.0f));
+
+  int offset = lane_id * 16;
+  const half *a_lhs = a + offset;
+  const half *a_rhs = a + offset + 8;
+  const half *b_lhs = b + offset;
+
+  // asm volatile(
+  //     "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
+  //     : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
+  //     : "r"(get_smem_ptr(a_lhs)));
 
   asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
+               : "=r"(A[0]), "=r"(A[1])
+               : "r"(get_smem_ptr(a_lhs)));
+  asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
+               : "=r"(A[2]), "=r"(A[3])
+               : "r"(get_smem_ptr(a_rhs)));
+
+  asm volatile("ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 {%0, %1}, [%2];"
                : "=r"(B[0]), "=r"(B[1])
-               : "r"(get_smem_ptr(&b)));
+               : "r"(get_smem_ptr(b_lhs)));
+
+  C[0] = c[row_c * 8 + col_c];
+  C[1] = c[row_c * 8 + col_c + 1];
+  C[2] = c[row_c_ex * 8 + col_c];
+  C[3] = c[row_c_ex * 8 + col_c + 1];
 
   asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
                " { %0, %1, %2, %3 }, "
@@ -77,10 +103,6 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
                : "=f"(D[0]), "=f"(D[1]), "=f"(D[2]), "=f"(D[3])
                : "r"(A[0]), "r"(A[1]), "r"(A[2]), "r"(A[3]), "r"(B[0]),
                  "r"(B[1]), "f"(C[0]), "f"(C[1]), "f"(C[2]), "f"(C[3]));
-
-  int row_c = group_id; // i < 2
-  int row_c_ex = group_id + 8;
-  int col_c = thread_in_group * 2; // each thread takes f32x2 contiguous mem
 
   // TODO: convert to float2 transfer, may be faster
   d[row_c * 8 + col_c] = D[0];

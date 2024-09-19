@@ -70,6 +70,13 @@ void ranges(float *mat, int N) {
   }
 }
 
+void ranges(float *mat, int N, int mod) {
+  int MOD = mod;
+  for (int i = 0; i < N; i++) {
+    mat[i] = i % MOD;
+  }
+}
+
 void zeros(float *mat, int N) {
   for (int i = 0; i < N; i++) {
     mat[i] = 0.0;
@@ -113,10 +120,12 @@ bool verify_matrix(float *matRef, float *matOut, int N) {
   double diff = 0.0;
   int i;
   for (i = 0; i < N; i++) {
-    rel_diff = std::fabs(matRef[i] - matOut[i])/std::fabs(matRef[i]);
+    rel_diff = std::fabs(matRef[i] - matOut[i]) / std::fabs(matRef[i]);
     diff = std::fabs(matRef[i] - matOut[i]);
-    if ((std::fabs(matRef[i]) > 1 && rel_diff > 0.05) || (std::fabs(matRef[i]) < 1 && diff > 0.02)) {
-      printf("Divergence! Should %5.2f, Is %5.2f (Abs Diff %5.2f) or (Relative Diff %5.2f\%) at %d\n",
+    if ((std::fabs(matRef[i]) > 1 && rel_diff > 0.05) ||
+        (std::fabs(matRef[i]) < 1 && diff > 0.02)) {
+      printf("Divergence! Should %5.2f, Is %5.2f (Abs Diff %5.2f) or (Relative "
+             "Diff %5.2f\%) at %d\n",
              matRef[i], matOut[i], diff, rel_diff * 100., i);
       return false;
     }
@@ -161,7 +170,7 @@ void runCublasTF32(cublasHandle_t handle, int M, int N, int K, float alpha,
 }
 
 // TODO: omit this wrapper
-void run_reference(int M, int N, int K, float alpha, float *A,
-                float *B, float beta, float *C, cublasHandle_t handle) {
+void run_reference(int M, int N, int K, float alpha, float *A, float *B,
+                   float beta, float *C, cublasHandle_t handle) {
   runCublasBF16(handle, M, N, K, alpha, A, B, beta, C);
 }
