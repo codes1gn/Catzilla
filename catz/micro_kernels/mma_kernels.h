@@ -47,21 +47,6 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
   int group_id = lane_id / 4; // id of quad group where 32 threads are arranged
   int thread_in_group = lane_id % 4;
 
-  int row_a = group_id;        // 0, 1, 4, 5
-  int row_a_ex = group_id + 8; // 2, 3, 6, 7
-
-  int col_a = 2 * thread_in_group;        // 0, 1, 2, 3
-  int col_a_ex = 2 * thread_in_group + 8; // 4, 5, 6, 7
-  //
-  int row_b = thread_in_group;        // i < 2
-  int row_b_ex = thread_in_group + 4; // i >= 2
-  //
-  int col_b = group_id;
-
-  int row_c = group_id; // i < 2
-  int row_c_ex = group_id + 8;
-  int col_c = thread_in_group * 2; // each thread takes f32x2 contiguous mem
-
   unsigned A[4];
   unsigned B[2];
   float C[4];
@@ -70,17 +55,9 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
   // initialize_unsigned_half(A, 4, __float2half(0.0f));
   // initialize_unsigned_half(B, 2, __float2half(1.0f));
 
-  // int offset = lane_id * 16;
-  // const half *a_lhs = a + offset;
-  // const half *a_rhs = a + offset + 8;
-
   int lorr = lane_id / 16;
   int lorr_id = lane_id % 16;
   const half *a_new = a + lorr_id * 16 + lorr * 8;
-
-  int uord = lane_id / 8;
-  int uord_id = lane_id % 8;
-  const half *b_new = b + uord * 8 + uord_id * 16;
 
   // TODO: pack all these abstractions back to Matrix
   asm volatile(
@@ -88,27 +65,30 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
     : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
     : "r"(get_smem_ptr(a_new)));
 
-  // NOTE: TO-T16:, point at header loc of each row: matrix has 16x16 of halfs,
-  // forms 4 matrices, each has 8x8 halfs, thus the row-stride == 16, if use x2,
-  // only T0-T16 involves into datamove, we need T0-T31 together, we need X4
-  // T16-T32:, point as mid point of each row.
-  //
-  // asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
-  //              : "=r"(A[0]), "=r"(A[1])
-  //              : "r"(get_smem_ptr(a_lhs)));
-  // asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
-  //              : "=r"(A[2]), "=r"(A[3])
-  //              : "r"(get_smem_ptr(a_rhs)));
+  int uord = lane_id / 8;
+  int uord_id = lane_id % 8;
+  const half *b_new = b + uord * 8 + uord_id * 16;
 
   asm volatile("ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 {%0, %1}, [%2];"
                : "=r"(B[0]), "=r"(B[1])
                : "r"(get_smem_ptr(b_new)));
 
   // TODO: make it ldmatrix
+  int row_c = group_id; // i < 2
+  int row_c_ex = group_id + 8;
+  int col_c = thread_in_group * 2; // each thread takes f32x2 contiguous mem
+
   C[0] = c[row_c * 8 + col_c];
   C[1] = c[row_c * 8 + col_c + 1];
   C[2] = c[row_c_ex * 8 + col_c];
   C[3] = c[row_c_ex * 8 + col_c + 1];
+
+  // const float *c_new = c + lane_id * 8;
+  //
+  // asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1, %2, %3},
+  // [%2];"
+  //              : "=r"(C[0]), "=r"(C[1]), "=r"(C[2]), "=r"(C[3])
+  //              : "r"(get_smem_ptr(c_new)));
 
   asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
                " { %0, %1, %2, %3 }, "
@@ -124,106 +104,145 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
   d[row_c * 8 + col_c + 1] = D[1];
   d[row_c_ex * 8 + col_c] = D[2];
   d[row_c_ex * 8 + col_c + 1] = D[3];
-
-  // asm volatile("stmatrix.sync.aligned.m8n8.x4.b16 "
-  //              "[%0], {%1, %2, %3, %4};"
-  //              : "=l"(d)
-  //              : "f"(C[0]), "f"(C[1]), "f"(C[2]), "f"(C[3]));
-
-  // uint32_t const *A = reinterpret_cast<uint32_t const *>(&a);
-  // uint32_t const *B = reinterpret_cast<uint32_t const *>(&b);
-  // float const *C = reinterpret_cast<float const *>(&c);
-  // float *D = reinterpret_cast<float *>(&d);
-
-  // asm("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
-  //     " { %0, %1, %2, %3 }, "
-  //     " { %4, %5, %6, %7 }, "
-  //     " { %8, %9 }, "
-  //     " { %10, %11, %12, %13 };"
-  //     : "=f"(D[row_c*8+col_c]),
-  //       "=f"(D[row_c*8+col_c + 1]),
-  //       "=f"(D[row_c_ex*8+col_c]),
-  //       "=f"(D[row_c_ex*8+col_c + 1])
-  //     : "r"(A[row_a*8+col_a]),
-  //       "r"(A[row_a_ex*8+col_a]),
-  //       "r"(A[row_a*8+col_a_ex]),
-  //       "r"(A[row_a_ex*8+col_a_ex]),
-  //       "r"(B[row_b*8+col_b]),
-  //       "r"(B[row_b_ex*8+col_b]),
-  //       "f"(C[row_c*8+col_c]),
-  //       "f"(C[row_c*8+col_c + 1]),
-  //       "f"(C[row_c_ex*8+col_c]),
-  //       "f"(C[row_c_ex*8+col_c + 1]));
 }
 
-inline __device__ void mma_m16n8k4_tf32f32(float *d, const float *a,
-                                           const float *b, const float *c)
+inline __device__ void mma_m16n8k8_f16f32(float *d, const half *a,
+                                          const half *b, const float *c)
 {
   int lane_id = threadIdx.x % 32;
-  int outer = lane_id / 4;
-  int inner = lane_id % 4;
 
-  int c_outer = lane_id / 4;
-  int c_inner = 2 * (lane_id % 4);
+  unsigned A[2];
+  unsigned B[1];
+  float C[4];
+  float D[4];
 
-  int ab_idx = outer * 4 + inner;
-  int cd_idx = c_outer * 8 + c_inner;
+  // initialize_unsigned_half(A, 4, __float2half(0.0f));
+  // initialize_unsigned_half(B, 2, __float2half(1.0f));
 
-  int cd_stride = 64;
-  int ab_stride_inner = 4;
-  int ab_stride_outer = 64;
+  int lorr_id = lane_id % 16;
+  const half *a_new = a + lorr_id * 8;
 
-  uint32_t const *A = reinterpret_cast<uint32_t const *>(&a);
-  uint32_t const *B = reinterpret_cast<uint32_t const *>(&b);
-  float const *C = reinterpret_cast<float const *>(&c);
-  float *D = reinterpret_cast<float *>(&d);
+  // TODO: pack all these abstractions back to Matrix
+  asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
+               : "=r"(A[0]), "=r"(A[1])
+               : "r"(get_smem_ptr(a_new)));
 
-  asm("mma.sync.aligned.m16n8k4.row.col.f32.tf32.tf32.f32 "
-      " { %0, %1, %2, %3 }, "
-      " { %4, %5 }, "
-      " { %6 }, "
-      " { %7, %8, %9, %10 };"
-      : "=f"(D[cd_idx]), "=f"(D[cd_idx + 1]), "=f"(D[cd_stride + cd_idx]),
-        "=f"(D[cd_stride + cd_idx + 1])
-      : "r"(A[ab_idx]), "r"(A[ab_stride_outer + ab_idx]), "r"(B[ab_idx]),
-        "f"(C[cd_idx]), "f"(C[cd_idx + 1]), "f"(C[cd_stride + cd_idx]),
-        "f"(C[cd_stride + cd_idx + 1]));
+  int uord_id = lane_id % 8;
+  const half *b_new = b + uord_id * 8;
+
+  asm volatile("ldmatrix.sync.aligned.m8n8.x1.trans.shared.b16 {%0}, [%1];"
+               : "=r"(B[0])
+               : "r"(get_smem_ptr(b_new)));
+
+  C[0] = c[(lane_id / 4) * 8 + (lane_id % 4) * 2];
+  C[1] = c[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 1];
+  C[2] = c[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 64];
+  C[3] = c[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 65];
+
+  asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32 "
+               " { %0, %1, %2, %3 }, "
+               " { %4, %5 }, "
+               " { %6 }, "
+               " { %7, %8, %9, %10 };"
+               : "=f"(D[0]), "=f"(D[1]), "=f"(D[2]), "=f"(D[3])
+               : "r"(A[0]), "r"(A[1]), "r"(B[0]), "f"(C[0]), "f"(C[1]),
+                 "f"(C[2]), "f"(C[3]));
+
+  // TODO: convert to float2 transfer, may be faster
+  d[(lane_id / 4) * 8 + (lane_id % 4) * 2] = D[0];
+  d[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 1] = D[1];
+  d[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 64] = D[2];
+  d[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 65] = D[3];
 }
+
+// TODO: enable this kernel
+// inline __device__ void mma_m16n8k4_tf32f32(float *d, const float *a,
+//                                            const float *b, const float *c)
+// {
+//   int lane_id = threadIdx.x % 32;
+//   int outer = lane_id / 4;
+//   int inner = lane_id % 4;
+//
+//   int c_outer = lane_id / 4;
+//   int c_inner = 2 * (lane_id % 4);
+//
+//   int ab_idx = outer * 4 + inner;
+//   int cd_idx = c_outer * 8 + c_inner;
+//
+//   int cd_stride = 64;
+//   int ab_stride_inner = 4;
+//   int ab_stride_outer = 64;
+//
+//   uint32_t const *A = reinterpret_cast<uint32_t const *>(&a);
+//   uint32_t const *B = reinterpret_cast<uint32_t const *>(&b);
+//   float const *C = reinterpret_cast<float const *>(&c);
+//   float *D = reinterpret_cast<float *>(&d);
+//
+//   asm("mma.sync.aligned.m16n8k4.row.col.f32.tf32.tf32.f32 "
+//       " { %0, %1, %2, %3 }, "
+//       " { %4, %5 }, "
+//       " { %6 }, "
+//       " { %7, %8, %9, %10 };"
+//       : "=f"(D[cd_idx]), "=f"(D[cd_idx + 1]), "=f"(D[cd_stride + cd_idx]),
+//         "=f"(D[cd_stride + cd_idx + 1])
+//       : "r"(A[ab_idx]), "r"(A[ab_stride_outer + ab_idx]), "r"(B[ab_idx]),
+//         "f"(C[cd_idx]), "f"(C[cd_idx + 1]), "f"(C[cd_stride + cd_idx]),
+//         "f"(C[cd_stride + cd_idx + 1]));
+// }
 
 inline __device__ void mma_m16n8k8_tf32f32(float *d, const float *a,
                                            const float *b, const float *c)
 {
   int lane_id = threadIdx.x % 32;
-  int outer = lane_id / 4;
-  int inner = lane_id % 4;
 
-  int c_outer = lane_id / 4;
-  int c_inner = 2 * (lane_id % 4);
+  unsigned A[4];
+  unsigned B[2];
+  float C[4];
+  float D[4];
 
-  int ab_idx = outer * 4 + inner;
-  int cd_idx = c_outer * 8 + c_inner;
+  int lorr = lane_id / 16;
+  int lorr_id = lane_id % 16;
+  const float *a_new = a + lorr_id * 16 + lorr * 8;
 
-  int cd_stride = 64;
-  int ab_stride_inner = 4;
-  int ab_stride_outer = 64;
+  // TODO: pack all these abstractions back to Matrix
+  asm volatile(
+    "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
+    : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
+    : "r"(get_smem_ptr(a_new)));
 
-  uint32_t const *A = reinterpret_cast<uint32_t const *>(&a);
-  uint32_t const *B = reinterpret_cast<uint32_t const *>(&b);
-  float const *C = reinterpret_cast<float const *>(&c);
-  float *D = reinterpret_cast<float *>(&d);
+  int uord = lane_id / 8;
+  int uord_id = lane_id % 8;
+  const float *b_new = b + uord * 8 + uord_id * 16;
+
+  asm volatile("ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 {%0, %1}, [%2];"
+               : "=r"(B[0]), "=r"(B[1])
+               : "r"(get_smem_ptr(b_new)));
+
+  // TODO: make it ldmatrix
+  int group_id = lane_id / 4; // id of quad group where 32 threads are arranged
+  int thread_in_group = lane_id % 4;
+  int row_c = group_id; // i < 2
+  int row_c_ex = group_id + 8;
+  int col_c = thread_in_group * 2; // each thread takes f32x2 contiguous mem
+
+  C[0] = c[row_c * 8 + col_c];
+  C[1] = c[row_c * 8 + col_c + 1];
+  C[2] = c[row_c_ex * 8 + col_c];
+  C[3] = c[row_c_ex * 8 + col_c + 1];
 
   asm("mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32 "
       " { %0, %1, %2, %3 }, "
       " { %4, %5, %6, %7 }, "
       " { %8, %9 }, "
       " { %10, %11, %12, %13 };"
-      : "=f"(D[cd_idx]), "=f"(D[cd_idx + 1]), "=f"(D[cd_stride + cd_idx]),
-        "=f"(D[cd_stride + cd_idx + 1])
-      : "r"(A[ab_idx]), "r"(A[ab_idx + ab_stride_inner]),
-        "r"(A[ab_stride_outer + ab_idx]),
-        "r"(A[ab_stride_outer + ab_idx + ab_stride_inner]), "r"(B[ab_idx]),
-        "r"(B[ab_stride_inner + ab_idx]), "f"(C[cd_idx]), "f"(C[cd_idx + 1]),
-        "f"(C[cd_stride + cd_idx]), "f"(C[cd_stride + cd_idx + 1]));
+      : "=f"(D[0]), "=f"(D[1]), "=f"(D[2]), "=f"(D[3])
+      : "r"(A[0]), "r"(A[1]), "r"(A[2]), "r"(A[3]), "r"(B[0]), "r"(B[1]),
+        "f"(C[0]), "f"(C[1]), "f"(C[2]), "f"(C[3]));
+
+  d[row_c * 8 + col_c] = D[0];
+  d[row_c * 8 + col_c + 1] = D[1];
+  d[row_c_ex * 8 + col_c] = D[2];
+  d[row_c_ex * 8 + col_c + 1] = D[3];
 }
 
 } // namespace catz::mma

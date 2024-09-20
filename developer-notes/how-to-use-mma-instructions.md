@@ -330,6 +330,9 @@ TODO: add statements
   // if use x2, only T0-T16 involves into datamove, we need T0-T31 together, we need X4
   // T16-T32:, point as mid point of each row.
   //
+  // int offset = lane_id * 16;
+  // const half *a_lhs = a + offset;
+  // const half *a_rhs = a + offset + 8;
   // asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
   //              : "=r"(A[0]), "=r"(A[1])
   //              : "r"(get_smem_ptr(a_lhs)));

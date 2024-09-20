@@ -1,0 +1,11 @@
+20-
+0. different shape of f16 mma kernel
+1. tf32 kernel pass
+2. add TODO to baseline accrucy
+21-
+3. handle C reuse issue
+4. make one faster kernel, not limit to. (need to pack fragment loading in Matrix design)
+22-
+5. add cp.async
+23-
+6. integrate to choreo // next week

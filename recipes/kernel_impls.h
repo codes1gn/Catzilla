@@ -34,13 +34,16 @@ inline void matmul_exec(int impl_idx, int M, int N, int K, float alpha,
     matmul_vload_vstore(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 9) {
     // wmma.mma.sync.aligned.m16n16k16.row.col.f32.f32
-    matmul_tensor_cores_wmma_f16f32(M, N, K, alpha, A, B, beta, C);
+    matmul_tensor_cores_wmma_m16n16k16_f16f32(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 10) {
-    // mma.sync.aligned.m16n16k8.row.col.f32.f16.f16.f32
-    matmul_tensor_cores_mma_f16f32(M, N, K, alpha, A, B, beta, C);
+    // mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32
+    matmul_tensor_cores_mma_m16n8k16_f16f32(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 11) {
+    // mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32
+    matmul_tensor_cores_mma_m16n8k8_f16f32(M, N, K, alpha, A, B, beta, C);
+  } else if (impl_idx == 12) {
     // mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32
-    matmul_tensor_cores_mma_tf32f32(M, N, K, alpha, A, B, beta, C);
+    matmul_tensor_cores_mma_m16n8k8_tf32f32(M, N, K, alpha, A, B, beta, C);
   } else {
     printf("[ERROR] kernel id not exists\n");
     exit(EXIT_FAILURE);
