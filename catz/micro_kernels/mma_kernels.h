@@ -39,6 +39,7 @@ __device__ __forceinline__ uint get_smem_ptr(const void *ptr)
 // and only binds threadIdx.y outer from this kernel
 // this setting ensures this kernels uses same threadIdx.y, AND DIFF X (0-31)
 // TODO: align naming with ptx manual
+// TODO: need housekeeping
 inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
                                            const half *b, const float *c)
 {
@@ -69,27 +70,41 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
   // initialize_unsigned_half(A, 4, __float2half(0.0f));
   // initialize_unsigned_half(B, 2, __float2half(1.0f));
 
-  int offset = lane_id * 16;
-  const half *a_lhs = a + offset;
-  const half *a_rhs = a + offset + 8;
-  const half *b_lhs = b + offset;
+  // int offset = lane_id * 16;
+  // const half *a_lhs = a + offset;
+  // const half *a_rhs = a + offset + 8;
 
-  // asm volatile(
-  //     "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
-  //     : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
-  //     : "r"(get_smem_ptr(a_lhs)));
+  int lorr = lane_id / 16;
+  int lorr_id = lane_id % 16;
+  const half *a_new = a + lorr_id * 16 + lorr * 8;
 
-  asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
-               : "=r"(A[0]), "=r"(A[1])
-               : "r"(get_smem_ptr(a_lhs)));
-  asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
-               : "=r"(A[2]), "=r"(A[3])
-               : "r"(get_smem_ptr(a_rhs)));
+  int uord = lane_id / 8;
+  int uord_id = lane_id % 8;
+  const half *b_new = b + uord * 8 + uord_id * 16;
+
+  // TODO: pack all these abstractions back to Matrix
+  asm volatile(
+    "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
+    : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
+    : "r"(get_smem_ptr(a_new)));
+
+  // NOTE: TO-T16:, point at header loc of each row: matrix has 16x16 of halfs,
+  // forms 4 matrices, each has 8x8 halfs, thus the row-stride == 16, if use x2,
+  // only T0-T16 involves into datamove, we need T0-T31 together, we need X4
+  // T16-T32:, point as mid point of each row.
+  //
+  // asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
+  //              : "=r"(A[0]), "=r"(A[1])
+  //              : "r"(get_smem_ptr(a_lhs)));
+  // asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
+  //              : "=r"(A[2]), "=r"(A[3])
+  //              : "r"(get_smem_ptr(a_rhs)));
 
   asm volatile("ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 {%0, %1}, [%2];"
                : "=r"(B[0]), "=r"(B[1])
-               : "r"(get_smem_ptr(b_lhs)));
+               : "r"(get_smem_ptr(b_new)));
 
+  // TODO: make it ldmatrix
   C[0] = c[row_c * 8 + col_c];
   C[1] = c[row_c * 8 + col_c + 1];
   C[2] = c[row_c_ex * 8 + col_c];
