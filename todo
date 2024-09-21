@@ -1,11 +1,14 @@
-20-
-0. different shape of f16 mma kernel
-1. tf32 kernel pass
-2. add TODO to baseline accrucy
-21-
-3. handle C reuse issue
+======================= DONE ==============================
+
+0. different shape of f16 mma kernel : done
+1. tf32 kernel pass : lhs ldmatrix passed, mma passed, rhs ldmatrix still has bug
+
+======================= TODO ==============================
+
 4. make one faster kernel, not limit to. (need to pack fragment loading in Matrix design)
-22-
+*. repack into Matrix : dist_to_fragments, and can be wrapped within kernel, make kernel interface as Matrix (c with float*, will be opt'd latter)
 5. add cp.async
-23-
 6. integrate to choreo // next week
+
+2. add TODO to baseline accrucy : pending, leave to latter dev
+3. handle C reuse issue : we fine, we can work now, and not become bottleneck yet.

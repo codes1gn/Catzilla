@@ -43,7 +43,12 @@ inline void matmul_exec(int impl_idx, int M, int N, int K, float alpha,
     matmul_tensor_cores_mma_m16n8k8_f16f32(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 12) {
     // mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32
+    // TODO: RHS MATRIX has bug in ldmatrix inst
     matmul_tensor_cores_mma_m16n8k8_tf32f32(M, N, K, alpha, A, B, beta, C);
+  } else if (impl_idx == 13) {
+    // mma.sync.aligned.m16n8k4.row.col.f32.tf32.tf32.f32
+    // TODO: RHS MATRIX has bug in ldmatrix inst
+    matmul_tensor_cores_mma_m16n8k4_tf32f32(M, N, K, alpha, A, B, beta, C);
   } else {
     printf("[ERROR] kernel id not exists\n");
     exit(EXIT_FAILURE);

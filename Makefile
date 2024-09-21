@@ -105,6 +105,9 @@ bench: build
 dev-m16n8k16: build
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 16 -size-n 8 -size-k 16
 
+dev-m16n8k8: build
+	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 16 -size-n 8 -size-k 8
+
 dev: build 
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 16 -size-n 16 -size-k 16
 

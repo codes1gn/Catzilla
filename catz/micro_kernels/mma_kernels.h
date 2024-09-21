@@ -30,6 +30,16 @@ inline __device__ void initialize_unsigned_half(unsigned *A, int elems,
   }
 }
 
+inline __device__ void initialize_unsigned_tf32(unsigned *A, int elems,
+                                                float value)
+{
+  for (int i = 0; i < elems; i++) {
+    uint32_t b;
+    asm volatile("cvt.rna.tf32.f32 %0, %1;\n" : "=r"(b) : "f"(value));
+    A[i] = b;
+  }
+}
+
 __device__ __forceinline__ uint get_smem_ptr(const void *ptr)
 {
   return static_cast<unsigned>(__cvta_generic_to_shared(ptr));
@@ -198,11 +208,15 @@ inline __device__ void mma_m16n8k8_tf32f32(float *d, const float *a,
   unsigned A[4];
   unsigned B[2];
   float C[4];
-  float D[4];
+  float D[4] = {1.0, 1.0, 1.0, 1.0};
+
+  // initialize_unsigned_tf32(A, 4, 1.0f);
+  // initialize_unsigned_tf32(B, 2, 1.0f);
 
   int lorr = lane_id / 16;
   int lorr_id = lane_id % 16;
-  const float *a_new = a + lorr_id * 16 + lorr * 8;
+  // NOTE: in fp16 case, was 8 and 16 as x, y strides
+  const float *a_new = a + lorr_id * 8 + lorr * 4;
 
   // TODO: pack all these abstractions back to Matrix
   asm volatile(
@@ -210,16 +224,21 @@ inline __device__ void mma_m16n8k8_tf32f32(float *d, const float *a,
     : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
     : "r"(get_smem_ptr(a_new)));
 
-  int uord = lane_id / 8;
-  int uord_id = lane_id % 8;
-  const float *b_new = b + uord * 8 + uord_id * 16;
+  int uord = lane_id / 16;
+  int uord_id = (lane_id % 16);
+  const float *b_up = b + uord_id * 8;
+  const float *b_down = b + uord_id * 8 + 4;
 
-  asm volatile("ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 {%0, %1}, [%2];"
-               : "=r"(B[0]), "=r"(B[1])
-               : "r"(get_smem_ptr(b_new)));
+  asm volatile("ldmatrix.sync.aligned.m8n8.x1.trans.shared.b16 {%0}, [%1];"
+               : "=r"(B[0])
+               : "r"(get_smem_ptr(b_up)));
+
+  asm volatile("ldmatrix.sync.aligned.m8n8.x1.trans.shared.b16 {%0}, [%1];"
+               : "=r"(B[1])
+               : "r"(get_smem_ptr(b_down)));
 
   // TODO: make it ldmatrix
-  int group_id = lane_id / 4; // id of quad group where 32 threads are arranged
+  int group_id = lane_id / 4; // id of quad group where 32 threads are
   int thread_in_group = lane_id % 4;
   int row_c = group_id; // i < 2
   int row_c_ex = group_id + 8;
@@ -243,6 +262,55 @@ inline __device__ void mma_m16n8k8_tf32f32(float *d, const float *a,
   d[row_c * 8 + col_c + 1] = D[1];
   d[row_c_ex * 8 + col_c] = D[2];
   d[row_c_ex * 8 + col_c + 1] = D[3];
+}
+
+inline __device__ void mma_m16n8k4_tf32f32(float *d, const float *a,
+                                           const float *b, const float *c)
+{
+  int lane_id = threadIdx.x % 32;
+
+  unsigned A[2];
+  unsigned B[1];
+  float C[4];
+  float D[4];
+
+  // initialize_unsigned_half(A, 4, __float2half(0.0f));
+  // initialize_unsigned_tf32(B, 2, 1.0f);
+
+  int lorr_id = lane_id % 16;
+  const float *a_new = a + lorr_id * 4;
+
+  // TODO: pack all these abstractions back to Matrix
+  asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
+               : "=r"(A[0]), "=r"(A[1])
+               : "r"(get_smem_ptr(a_new)));
+
+  int uord_id = lane_id % 8;
+  const float *b_new = b + uord_id * 4;
+
+  asm volatile("ldmatrix.sync.aligned.m8n8.x1.trans.shared.b16 {%0}, [%1];"
+               : "=r"(B[0])
+               : "r"(get_smem_ptr(b_new)));
+
+  C[0] = c[(lane_id / 4) * 8 + (lane_id % 4) * 2];
+  C[1] = c[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 1];
+  C[2] = c[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 64];
+  C[3] = c[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 65];
+
+  asm volatile("mma.sync.aligned.m16n8k4.row.col.f32.tf32.tf32.f32 "
+               " { %0, %1, %2, %3 }, "
+               " { %4, %5 }, "
+               " { %6 }, "
+               " { %7, %8, %9, %10 };"
+               : "=f"(D[0]), "=f"(D[1]), "=f"(D[2]), "=f"(D[3])
+               : "r"(A[0]), "r"(A[1]), "r"(B[0]), "f"(C[0]), "f"(C[1]),
+                 "f"(C[2]), "f"(C[3]));
+
+  // TODO: convert to float2 transfer, may be faster
+  d[(lane_id / 4) * 8 + (lane_id % 4) * 2] = D[0];
+  d[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 1] = D[1];
+  d[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 64] = D[2];
+  d[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 65] = D[3];
 }
 
 } // namespace catz::mma
