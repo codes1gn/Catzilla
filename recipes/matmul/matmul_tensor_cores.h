@@ -208,8 +208,10 @@ __global__ void _matmul_tensor_cores_mma_m16n8k8_f16f32(int M, int N, int K,
     // contract at 128x128x32 micro-kernel
     // cuda_m16n8k16_f16f32(out_shared_mat.data, lhs_shared_mat.data,
     //                      rhs_shared_mat.data, out_shared_mat.data);
-    mma_m16n8k8_f16f32(out_shared_mat.data, lhs_shared_mat.data,
-                       rhs_shared_mat.data, out_shared_mat.data);
+    mma_m16n8k8_f16f32_neo(out_shared_mat, lhs_shared_mat, rhs_shared_mat,
+                           out_shared_mat);
+    // mma_m16n8k8_f16f32(out_shared_mat.data, lhs_shared_mat.data,
+    //                    rhs_shared_mat.data, out_shared_mat.data);
     // identity<16, 8>(lhs_shared_mat, out_shared_mat.tile_ex(Coord(0, ko),
     // Coord(16, 8))); identity<8, 16>(rhs_shared_mat,
     // out_shared_mat.tile_ex(Coord(ko, 0), Coord(8, 16)));

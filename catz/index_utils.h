@@ -1,7 +1,6 @@
 #ifndef CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
 #define CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
 
-#include "macros.h"
 #include <algorithm>
 #include <cassert>
 // #include <concepts>
@@ -14,6 +13,10 @@
 #include <tuple>
 #include <type_traits>
 
+#include "cuda_utils.h"
+#include "macros.h"
+
+// TODO: rename to matrix.h
 namespace catz
 {
 
@@ -220,10 +223,58 @@ template <typename T> struct Matrix {
     return std::move(ret);
   }
 
-  // inline __device__ Matrix& dist_nocopy(Coord tile_var) {
-  //   data += tile_var.x * stride.x + tile_var.y * stride.y;
-  //   return *this;
-  // }
+  // TODO: rename x, y into row, col
+  template <typename U = T>
+  inline __device__
+    typename std::enable_if<std::is_same<U, half>::value, void>::type
+    load_fragments(unsigned *loader)
+  {
+    // TODO: add loader length check
+    int lane_id = threadIdx.x % 32;
+    if (shape.x == 16 && shape.y == 8) {
+      int lorr_id = lane_id % 16;
+      const half *data_ptr = data + lorr_id * 8;
+      asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
+                   : "=r"(loader[0]), "=r"(loader[1])
+                   : "r"(get_smem_ptr(data_ptr)));
+    } else if (shape.x == 8 && shape.y == 8) {
+      // NOTE: rhs ldmatrix for half type, need a x1 load
+      int uord_id = lane_id % 8;
+      const half *data_new = data + uord_id * 8;
+
+      asm volatile("ldmatrix.sync.aligned.m8n8.x1.trans.shared.b16 {%0}, [%1];"
+                   : "=r"(loader[0])
+                   : "r"(get_smem_ptr(data_new)));
+    }
+  }
+
+  template <typename U = T>
+  inline __device__
+    typename std::enable_if<std::is_same<U, float>::value, void>::type
+    load_fragments_c(float *loader)
+  {
+    int lane_id = threadIdx.x % 32;
+    if (shape.x == 16 && shape.y == 8) {
+      loader[0] = data[(lane_id / 4) * 8 + (lane_id % 4) * 2];
+      loader[1] = data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 1];
+      loader[2] = data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 64];
+      loader[3] = data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 65];
+    }
+  }
+
+  template <typename U = T>
+  inline __device__
+    typename std::enable_if<std::is_same<U, float>::value, void>::type
+    store_fragments_c(float *storer)
+  {
+    int lane_id = threadIdx.x % 32;
+    if (shape.x == 16 && shape.y == 8) {
+      data[(lane_id / 4) * 8 + (lane_id % 4) * 2] = storer[0];
+      data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 1] = storer[1];
+      data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 64] = storer[2];
+      data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 65] = storer[3];
+    }
+  }
 
   __device__ void operator<=(const Matrix &other)
   {

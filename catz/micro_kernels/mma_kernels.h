@@ -8,6 +8,7 @@
 #include <cuda_runtime.h>
 #include <mma.h>
 
+#include "cuda_utils.h"
 #include "index_utils.h"
 
 using namespace catz;
@@ -38,11 +39,6 @@ inline __device__ void initialize_unsigned_tf32(unsigned *A, int elems,
     asm volatile("cvt.rna.tf32.f32 %0, %1;\n" : "=r"(b) : "f"(value));
     A[i] = b;
   }
-}
-
-__device__ __forceinline__ uint get_smem_ptr(const void *ptr)
-{
-  return static_cast<unsigned>(__cvta_generic_to_shared(ptr));
 }
 
 // assume we always use blockDim.x == 32, AS CONFIG
@@ -114,6 +110,34 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
   d[row_c * 8 + col_c + 1] = D[1];
   d[row_c_ex * 8 + col_c] = D[2];
   d[row_c_ex * 8 + col_c + 1] = D[3];
+}
+
+inline __device__ void mma_m16n8k8_f16f32_neo(Matrix<float> d, Matrix<half> a,
+                                              Matrix<half> b, Matrix<float> c)
+{
+  // TODO:
+  // make decl inside
+  // wrap mma.sync as kernel itself
+  // resolve hardcode of shape shifts
+  unsigned A[2];
+  unsigned B[1];
+  float C[4];
+  float D[4];
+
+  a.load_fragments(A);
+  b.load_fragments(B);
+  c.load_fragments_c(C);
+
+  asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32 "
+               " { %0, %1, %2, %3 }, "
+               " { %4, %5 }, "
+               " { %6 }, "
+               " { %7, %8, %9, %10 };"
+               : "=f"(D[0]), "=f"(D[1]), "=f"(D[2]), "=f"(D[3])
+               : "r"(A[0]), "r"(A[1]), "r"(B[0]), "f"(C[0]), "f"(C[1]),
+                 "f"(C[2]), "f"(C[3]));
+
+  d.store_fragments_c(D);
 }
 
 inline __device__ void mma_m16n8k8_f16f32(float *d, const half *a,
