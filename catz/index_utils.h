@@ -212,17 +212,6 @@ template <typename T> struct Matrix {
     }
   }
 
-  inline __device__ Matrix dist_to_thread()
-  {
-    int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
-    int row_in_current = flat_id / shape.y;
-    int col_in_current = flat_id % shape.y;
-    Matrix ret
-      = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
-               shape, stride);
-    return std::move(ret);
-  }
-
   // TODO: rename x, y into row, col
   template <typename U = T>
   inline __device__
@@ -231,20 +220,31 @@ template <typename T> struct Matrix {
   {
     // TODO: add loader length check
     int lane_id = threadIdx.x % 32;
+    int lane_rank = lane_id % shape.x;
+    int lane_group = lane_id / shape.x;
+    const half *data_ptr = data + lane_rank * stride.x + lane_group * 8;
     if (shape.x == 16 && shape.y == 8) {
-      int lorr_id = lane_id % 16;
-      const half *data_ptr = data + lorr_id * 8;
+      // LHS X2
       asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
                    : "=r"(loader[0]), "=r"(loader[1])
                    : "r"(get_smem_ptr(data_ptr)));
+    } else if (shape.x == 16 && shape.y == 16) {
+      // RHS X1
+      asm volatile(
+        "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
+        : "=r"(loader[0]), "=r"(loader[1]), "=r"(loader[2]), "=r"(loader[3])
+        : "r"(get_smem_ptr(data_ptr)));
     } else if (shape.x == 8 && shape.y == 8) {
-      // NOTE: rhs ldmatrix for half type, need a x1 load
-      int uord_id = lane_id % 8;
-      const half *data_new = data + uord_id * 8;
-
+      // LHS X4
       asm volatile("ldmatrix.sync.aligned.m8n8.x1.trans.shared.b16 {%0}, [%1];"
                    : "=r"(loader[0])
-                   : "r"(get_smem_ptr(data_new)));
+                   : "r"(get_smem_ptr(data_ptr)));
+    } else if (shape.x == 8 && shape.y == 16) {
+      // RHS X2
+      asm volatile(
+        "ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 {%0, %1}, [%2];"
+        : "=r"(loader[0]), "=r"(loader[1])
+        : "r"(get_smem_ptr(data_ptr)));
     }
   }
 
@@ -255,10 +255,12 @@ template <typename T> struct Matrix {
   {
     int lane_id = threadIdx.x % 32;
     if (shape.x == 16 && shape.y == 8) {
-      loader[0] = data[(lane_id / 4) * 8 + (lane_id % 4) * 2];
-      loader[1] = data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 1];
-      loader[2] = data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 64];
-      loader[3] = data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 65];
+      loader[0] = data[(lane_id / 4) * stride.x + (lane_id % 4) * 2];
+      loader[1] = data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 1];
+      loader[2]
+        = data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 8 * stride.x];
+      loader[3]
+        = data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 8 * stride.x + 1];
     }
   }
 
@@ -276,35 +278,55 @@ template <typename T> struct Matrix {
     }
   }
 
-  __device__ void operator<=(const Matrix &other)
+  inline __device__ Matrix dist_to_thread()
+  {
+    int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
+    int row_in_current = flat_id / shape.y;
+    int col_in_current = flat_id % shape.y;
+    Matrix ret
+      = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
+               shape, stride);
+    return std::move(ret);
+  }
+
+  // special operator that allows any same-volume copy, when the volume is
+  // dividable by threads volume
+  inline __device__ void operator<=(const Matrix &other)
   {
     int total_threads = blockDim.x * blockDim.y;
     int total_elements = shape.x * shape.y;
-    for (int i = 0; i < total_elements / total_threads; i++) {
-      // if (threadIdx.x == 0 && threadIdx.y == 0)
-      //   printf("i = %d; total_elements = %d; total_threads = %d\n", i,
-      //   total_elements, total_threads);
-      // int id = i*total_threads;
-      int id = i * total_threads + threadIdx.y * blockDim.x + threadIdx.x;
-      int row_in_thread = id / shape.y;
-      int col_in_thread = id % shape.y;
-      int offset = row_in_thread * stride.x + col_in_thread * stride.y;
-      // if (threadIdx.x == 0 && threadIdx.y == 0)
-      //   printf("id = %d; row_in_thread = %d; col_in_thread = %d; offset =
-      //   %d\n", id, row_in_thread, col_in_thread, offset);
-
-      int row_in_thread_ot = id / other.shape.y;
-      int col_in_thread_ot = id % other.shape.y;
-      int offset_ot
-        = row_in_thread_ot * other.stride.x + col_in_thread_ot * other.stride.y;
-      // if (threadIdx.x == 0 && threadIdx.y == 0)
-      //   printf("id = %d; row_in_thread_ot = %d; col_in_thread_ot = %d;
-      //   offset_ot = %d\n", id, row_in_thread_ot, col_in_thread_ot,
-      //   offset_ot);
-
-      data[offset] = other.data[offset_ot];
+    int thread_id = threadIdx.x + threadIdx.y * blockDim.x;
+    int row_this = thread_id / shape.y;
+    int col_this = thread_id % shape.y;
+    int row_other = thread_id / other.shape.y;
+    int col_other = thread_id % other.shape.y;
+#pragma unroll
+    for (int i = 0; i < total_elements; i += total_threads) {
+      data[i * stride.x / shape.y + row_this * stride.x + col_this]
+        = other.data[i * other.stride.x / other.shape.y
+                     + row_other * other.stride.x + col_other];
     }
-    // *data = *(other.data);
+  }
+
+  // TODO: merge it
+  template <typename U = T>
+  inline __device__
+    typename std::enable_if<std::is_same<U, half>::value, void>::type
+    operator<=(const Matrix<float> &other)
+  {
+    int total_threads = blockDim.x * blockDim.y;
+    int total_elements = shape.x * shape.y;
+    int thread_id = threadIdx.x + threadIdx.y * blockDim.x;
+    int row_this = thread_id / shape.y;
+    int col_this = thread_id % shape.y;
+    int row_other = thread_id / other.shape.y;
+    int col_other = thread_id % other.shape.y;
+#pragma unroll
+    for (int i = 0; i < total_elements; i += total_threads) {
+      data[i * stride.x / shape.y + row_this * stride.x + col_this]
+        = __float2half(other.data[i * other.stride.x / other.shape.y
+                                  + row_other * other.stride.x + col_other]);
+    }
   }
 
   __device__ void operator=(const Matrix<T> &other)

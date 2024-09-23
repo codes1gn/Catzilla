@@ -41,6 +41,28 @@ inline __device__ void initialize_unsigned_tf32(unsigned *A, int elems,
   }
 }
 
+inline __device__ void mma_m16n8k16_f16f32_neo(Matrix<float> d, Matrix<half> a,
+                                               Matrix<half> b, Matrix<float> c)
+{
+  unsigned A[4];
+  unsigned B[2];
+  float C[4];
+  float D[4];
+
+  a.load_fragments(A);
+  b.load_fragments(B);
+  c.load_fragments_c(C);
+  asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+               " { %0, %1, %2, %3 }, "
+               " { %4, %5, %6, %7 }, "
+               " { %8, %9 }, "
+               " { %10, %11, %12, %13 };"
+               : "=f"(D[0]), "=f"(D[1]), "=f"(D[2]), "=f"(D[3])
+               : "r"(A[0]), "r"(A[1]), "r"(A[2]), "r"(A[3]), "r"(B[0]),
+                 "r"(B[1]), "f"(C[0]), "f"(C[1]), "f"(C[2]), "f"(C[3]));
+  d.store_fragments_c(D);
+}
+
 // assume we always use blockDim.x == 32, AS CONFIG
 // and only binds threadIdx.y outer from this kernel
 // this setting ensures this kernels uses same threadIdx.y, AND DIFF X (0-31)
