@@ -300,7 +300,7 @@ template <typename T> struct Matrix {
     int col_this = thread_id % shape.y;
     int row_other = thread_id / other.shape.y;
     int col_other = thread_id % other.shape.y;
-#pragma unroll
+    // #pragma unroll
     for (int i = 0; i < total_elements; i += total_threads) {
       data[i * stride.x / shape.y + row_this * stride.x + col_this]
         = other.data[i * other.stride.x / other.shape.y
@@ -321,7 +321,7 @@ template <typename T> struct Matrix {
     int col_this = thread_id % shape.y;
     int row_other = thread_id / other.shape.y;
     int col_other = thread_id % other.shape.y;
-#pragma unroll
+    // #pragma unroll
     for (int i = 0; i < total_elements; i += total_threads) {
       data[i * stride.x / shape.y + row_this * stride.x + col_this]
         = __float2half(other.data[i * other.stride.x / other.shape.y
