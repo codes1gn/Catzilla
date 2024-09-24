@@ -670,11 +670,13 @@ _matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(int M, int N, int K, float alpha,
       __syncthreads();
 
       for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
-        mma_m16n8k8_f16f32_neo(
-          out_shared_mat.tile_ex(Coord(m, 0), Coord(M_REG, N_REG)),
-          lhs_shared_mat.tile_ex(Coord(0, kin), Coord(M_REG, K_REG)),
-          rhs_shared_mat.tile_ex(Coord(kin, 0), Coord(K_REG, N_REG)),
-          out_shared_mat.tile_ex(Coord(m, 0), Coord(M_REG, N_REG)));
+        for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
+          mma_m16n8k8_f16f32_neo(
+            out_shared_mat.tile_ex(Coord(m, n), Coord(M_REG, N_REG)),
+            lhs_shared_mat.tile_ex(Coord(m, kin), Coord(M_REG, K_REG)),
+            rhs_shared_mat.tile_ex(Coord(kin, n), Coord(K_REG, N_REG)),
+            out_shared_mat.tile_ex(Coord(m, n), Coord(M_REG, N_REG)));
+        }
       }
     }
   }
@@ -695,7 +697,7 @@ void matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(int M, int N, int K,
                                                   float *C)
 {
   const int M_TILE = 32;
-  const int N_TILE = 8;
+  const int N_TILE = 16;
   const int K_TILE = 16; // slice K_TILE TO K_REG with Y_thread
   const int M_REG = 16;
   const int N_REG = 8;
