@@ -271,10 +271,12 @@ template <typename T> struct Matrix {
   {
     int lane_id = threadIdx.x % 32;
     if (shape.x == 16 && shape.y == 8) {
-      data[(lane_id / 4) * 8 + (lane_id % 4) * 2] = storer[0];
-      data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 1] = storer[1];
-      data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 64] = storer[2];
-      data[(lane_id / 4) * 8 + (lane_id % 4) * 2 + 65] = storer[3];
+      data[(lane_id / 4) * stride.x + (lane_id % 4) * 2] = storer[0];
+      data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 1] = storer[1];
+      data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 8 * stride.x]
+        = storer[2];
+      data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 8 * stride.x + 1]
+        = storer[3];
     }
   }
 

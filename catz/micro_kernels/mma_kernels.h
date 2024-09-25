@@ -146,6 +146,8 @@ inline __device__ void mma_m16n8k8_f16f32_neo(Matrix<float> d, Matrix<half> a,
   float C[4];
   float D[4];
 
+  // initialize_unsigned_half(A, 2, __float2half(1.0f));
+  // initialize_unsigned_half(B, 1, __float2half(1.0f));
   a.load_fragments(A);
   b.load_fragments(B);
   c.load_fragments_c(C);
