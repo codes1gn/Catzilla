@@ -655,39 +655,61 @@ _matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(int M, int N, int K, float alpha,
 
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
     for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
-      for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
 #pragma unroll
-        lhs_shared_mat.tile_ex(Coord(m, kin), lhs_reg_tile_shape)
-          <= lhs_mat.tile_ex(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-               .tile_ex(Coord(m, kin), lhs_reg_tile_shape);
-      }
+      // if (threadIdx.y == 0)
+      //   for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
+      //     lhs_shared_mat.tile_ex(Coord(m, kin), lhs_reg_tile_shape)
+      //       <<= lhs_mat.tile_ex(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+      //            .tile_ex(Coord(m, kin), lhs_reg_tile_shape);
+      //   }
+      lhs_shared_mat.tile_ex(Coord(threadIdx.y, kin), lhs_reg_tile_shape)
+        <<= lhs_mat.tile_ex(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+              .tile_ex(Coord(threadIdx.y, kin), lhs_reg_tile_shape);
 #pragma unroll
-      for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-        rhs_shared_mat.tile_ex(Coord(kin, n), rhs_reg_tile_shape)
-          <= rhs_mat.tile_ex(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-               .tile_ex(Coord(kin, n), rhs_reg_tile_shape);
-      }
+      // if (threadIdx.y == 0)
+      //   for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
+      //     rhs_shared_mat.tile_ex(Coord(kin, n), rhs_reg_tile_shape)
+      //       <<= rhs_mat.tile_ex(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+      //            .tile_ex(Coord(kin, n), rhs_reg_tile_shape);
+      //   }
+      rhs_shared_mat.tile_ex(Coord(kin, threadIdx.y), rhs_reg_tile_shape)
+        <<= rhs_mat.tile_ex(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+              .tile_ex(Coord(kin, threadIdx.y), rhs_reg_tile_shape);
       __syncthreads();
 
-      for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
-        for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-          mma_m16n8k8_f16f32_neo(
-            out_shared_mat.tile_ex(Coord(m, n), Coord(M_REG, N_REG)),
-            lhs_shared_mat.tile_ex(Coord(m, kin), Coord(M_REG, K_REG)),
-            rhs_shared_mat.tile_ex(Coord(kin, n), Coord(K_REG, N_REG)),
-            out_shared_mat.tile_ex(Coord(m, n), Coord(M_REG, N_REG)));
-        }
+      // if (threadIdx.y == 0)
+      //   for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
+      //     for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
+      //       mma_m16n8k8_f16f32_neo(
+      //         out_shared_mat.tile_ex(Coord(m, n), Coord(M_REG, N_REG)),
+      //         lhs_shared_mat.tile_ex(Coord(m, kin), Coord(M_REG, K_REG)),
+      //         rhs_shared_mat.tile_ex(Coord(kin, n), Coord(K_REG, N_REG)),
+      //         out_shared_mat.tile_ex(Coord(m, n), Coord(M_REG, N_REG)));
+      //     }
+      //   }
+      for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
+        mma_m16n8k8_f16f32_neo(
+          out_shared_mat.tile_ex(Coord(threadIdx.y, n), Coord(M_REG, N_REG)),
+          lhs_shared_mat.tile_ex(Coord(threadIdx.y, kin), Coord(M_REG, K_REG)),
+          rhs_shared_mat.tile_ex(Coord(kin, n), Coord(K_REG, N_REG)),
+          out_shared_mat.tile_ex(Coord(threadIdx.y, n), Coord(M_REG, N_REG)));
       }
     }
   }
   __syncthreads();
 
-  for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
-    for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-      out_mat.tile_ex(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-          .tile_ex(Coord(m, n), out_reg_tile_shape)
-        <= out_shared_mat.tile_ex(Coord(m, n), out_reg_tile_shape);
-    }
+  // if (threadIdx.y == 0)
+  //   for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
+  //     for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
+  //       out_mat.tile_ex(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
+  //           .tile_ex(Coord(m, n), out_reg_tile_shape)
+  //         <<= out_shared_mat.tile_ex(Coord(m, n), out_reg_tile_shape);
+  //     }
+  //   }
+  for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
+    out_mat.tile_ex(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
+      .tile_ex(Coord(threadIdx.y, n), out_reg_tile_shape)
+      <<= out_shared_mat.tile_ex(Coord(threadIdx.y, n), out_reg_tile_shape);
   }
 }
 
@@ -696,26 +718,26 @@ void matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(int M, int N, int K,
                                                   float *B, float beta,
                                                   float *C)
 {
-  const int M_TILE = 32;
-  const int N_TILE = 16;
-  const int K_TILE = 16; // slice K_TILE TO K_REG with Y_thread
+  const int M_TILE = 64;
+  const int N_TILE = 32;
+  const int K_TILE = 64; // slice K_TILE TO K_REG with Y_thread
   const int M_REG = 16;
   const int N_REG = 8;
   const int K_REG = 8;
-  const int X_THREAD = 32;
-  const int Y_THREAD = 1;
+  const int WRAP_SIZE = 32;
+  const int WRAP_AMOUNT = 4;
   assert(M_REG * K_REG > X_THREAD * Y_THREAD);
   assert(N_REG * K_REG > X_THREAD * Y_THREAD);
 
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
-  dim3 blockDim(X_THREAD, Y_THREAD);
+  dim3 blockDim(WRAP_SIZE, WRAP_AMOUNT);
   cudaFuncSetAttribute(
     _matmul_tensor_cores_mma_m16n8k8_f16f32_tuned<
-      M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, X_THREAD, Y_THREAD>,
+      M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, WRAP_SIZE, WRAP_AMOUNT>,
     cudaFuncAttributePreferredSharedMemoryCarveout,
     cudaSharedmemCarveoutMaxShared);
   _matmul_tensor_cores_mma_m16n8k8_f16f32_tuned<
-    M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, X_THREAD, Y_THREAD>
+    M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, WRAP_SIZE, WRAP_AMOUNT>
     <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
   return;
 }

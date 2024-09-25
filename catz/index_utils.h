@@ -219,7 +219,7 @@ template <typename T> struct Matrix {
     load_fragments(unsigned *loader)
   {
     // TODO: add loader length check
-    int lane_id = threadIdx.x % 32;
+    int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
     int lane_rank = lane_id % shape.x;
     int lane_group = lane_id / shape.x;
     const half *data_ptr = data + lane_rank * stride.x + lane_group * 8;
@@ -253,7 +253,7 @@ template <typename T> struct Matrix {
     typename std::enable_if<std::is_same<U, float>::value, void>::type
     load_fragments_c(float *loader)
   {
-    int lane_id = threadIdx.x % 32;
+    int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
     if (shape.x == 16 && shape.y == 8) {
       loader[0] = data[(lane_id / 4) * stride.x + (lane_id % 4) * 2];
       loader[1] = data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 1];
@@ -269,7 +269,7 @@ template <typename T> struct Matrix {
     typename std::enable_if<std::is_same<U, float>::value, void>::type
     store_fragments_c(float *storer)
   {
-    int lane_id = threadIdx.x % 32;
+    int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
     if (shape.x == 16 && shape.y == 8) {
       data[(lane_id / 4) * stride.x + (lane_id % 4) * 2] = storer[0];
       data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 1] = storer[1];
@@ -280,24 +280,49 @@ template <typename T> struct Matrix {
     }
   }
 
-  inline __device__ Matrix dist_to_thread()
+  inline __device__ Matrix dist_to_wrap()
   {
-    int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
-    int row_in_current = flat_id / shape.y;
-    int col_in_current = flat_id % shape.y;
+    // NOTE: we can have three design
+    // 1. use all threads to spread
+    // 2. use x threads to spread
+    // 3. use a wrap to spread.
+    // we prefer to take third option in currently design
+    int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
+    int row_in_current = lane_id / shape.y;
+    int col_in_current = lane_id % shape.y;
     Matrix ret
       = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
                shape, stride);
     return std::move(ret);
   }
 
+  inline __device__ Matrix dist_to_thread()
+  {
+    // NOTE: we can have three design
+    // 1. use all threads to spread
+    // 2. use x threads to spread
+    // 3. use a wrap to spread.
+    // we prefer to take third option in currently design
+    int lane_id = threadIdx.y * blockDim.x + threadIdx.x;
+    int row_in_current = lane_id / shape.y;
+    int col_in_current = lane_id % shape.y;
+    Matrix ret
+      = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
+               shape, stride);
+    return std::move(ret);
+  }
+
+  // TODO: add dist_to(what)
+
   // special operator that allows any same-volume copy, when the volume is
   // dividable by threads volume
-  inline __device__ void operator<=(const Matrix &other)
+  inline __device__ void operator<<=(const Matrix &other)
   {
-    int total_threads = blockDim.x * blockDim.y;
+    int total_threads = blockDim.x;
+    // int total_threads = blockDim.x * blockDim.y;
     int total_elements = shape.x * shape.y;
-    int thread_id = threadIdx.x + threadIdx.y * blockDim.x;
+    int thread_id = (threadIdx.x + threadIdx.y * blockDim.x) % 32;
+    // int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
     int row_this = thread_id / shape.y;
     int col_this = thread_id % shape.y;
     int row_other = thread_id / other.shape.y;
@@ -310,7 +335,46 @@ template <typename T> struct Matrix {
     }
   }
 
+  inline __device__ void operator<=(const Matrix &other)
+  {
+    int total_threads = blockDim.x * blockDim.y;
+    int total_elements = shape.x * shape.y;
+    int thread_id = threadIdx.y * blockDim.x + threadIdx.x;
+    int row_this = thread_id / shape.y;
+    int col_this = thread_id % shape.y;
+    int row_other = thread_id / other.shape.y;
+    int col_other = thread_id % other.shape.y;
+    // #pragma unroll
+    for (int i = 0; i < total_elements; i += total_threads) {
+      data[i * stride.x / shape.y + row_this * stride.x + col_this]
+        = other.data[i * other.stride.x / other.shape.y
+                     + row_other * other.stride.x + col_other];
+    }
+  }
   // TODO: merge it
+  // use threads in one wrap to move it
+  template <typename U = T>
+  inline __device__
+    typename std::enable_if<std::is_same<U, half>::value, void>::type
+    operator<<=(const Matrix<float> &other)
+  {
+    int total_threads = blockDim.x;
+    // int total_threads = blockDim.x * blockDim.y;
+    int total_elements = shape.x * shape.y;
+    int thread_id = (threadIdx.x + threadIdx.y * blockDim.x) % 32;
+    int row_this = thread_id / shape.y;
+    int col_this = thread_id % shape.y;
+    int row_other = thread_id / other.shape.y;
+    int col_other = thread_id % other.shape.y;
+    // #pragma unroll
+    for (int i = 0; i < total_elements; i += total_threads) {
+      data[i * stride.x / shape.y + row_this * stride.x + col_this]
+        = __float2half(other.data[i * other.stride.x / other.shape.y
+                                  + row_other * other.stride.x + col_other]);
+    }
+  }
+
+  // use all threads to move
   template <typename U = T>
   inline __device__
     typename std::enable_if<std::is_same<U, half>::value, void>::type
