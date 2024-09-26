@@ -5,15 +5,16 @@
 *. repack into Matrix : dist_to_fragments, and can be wrapped within kernel, make kernel interface as Matrix (c with float*, will be opt'd latter)
 *. refactor API
 *. add C-CACHE, set it to choreo
+*. matmul_tensor_cores.h, line 69, fix bug, cause: non-normalised loop and symbolic index calculation
 
 ======================= TODO ==============================
 
-*. matmul_tensor_cores.h, line 69, fix bug
 *. make one faster kernel, not limit to. (need to pack fragment loading in Matrix design)
 *. add cp.async
 *. integrate to choreo // next week
 *. add f4copy to <=
 *. add border check to <=, allow more, allow less, allow tail, use ldmatrix-like design
+*. use compile-time value for Matrix design, like nalgebra
 
 *. add TODO to baseline accrucy : pending, leave to latter dev
 *. handle C reuse issue : we fine, we can work now, and not become bottleneck yet.

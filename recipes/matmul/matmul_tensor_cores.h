@@ -66,46 +66,21 @@ _matmul_tensor_cores_wmma_m16n16k16_f16f32(int M, int N, int K, float alpha,
   //   = make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD)>();
 
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
-    // TODO: fix bug, why <= slower than dist_to_thread
-    for (int m = 0; m < CEIL_DIV(M_TILE, 2); m++) {
-      for (int kin = 0; kin < CEIL_DIV(K_TILE, 16); kin++) {
-        lhs_shared_mat.tile(Coord(m, kin), Coord(2, 16)).dist_to_thread()
-          = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-              .tile(Coord(m, kin), Coord(2, 16))
-              .dist_to_thread();
-      }
+    for (int kin = 0; kin < CEIL_DIV(K_TILE, 16); kin++) {
+      lhs_shared_mat.tile(Coord(0, kin), Coord(M_TILE, 16))
+        <= lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+             .tile(Coord(0, kin), Coord(M_TILE, 16));
     }
-    // for (int kin = 0; kin < CEIL_DIV(K_TILE, 16); kin++) {
-    //   lhs_shared_mat.tile(Coord(0, kin), Coord(M_TILE, 16))
-    //     <= lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-    //         .tile(Coord(0, kin), Coord(M_TILE, 16));
-    // }
-    for (int kin = 0; kin < CEIL_DIV(K_TILE, 2); kin++) {
-#pragma unroll
-      for (int n = 0; n < CEIL_DIV(N_TILE, 16); n++) {
-        rhs_shared_mat.tile(Coord(kin, n), Coord(2, 16)).dist_to_thread()
-          = rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
-              .tile(Coord(kin, n), Coord(2, 16))
-              .dist_to_thread();
-      }
-    }
-    // rhs_shared_mat <= rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape);
+    rhs_shared_mat <= rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape);
     __syncthreads();
 
-    // contract at 128x128x32 micro-kernel
-    // matmul_kernel_16x16x16_thread_32(lhs_shared_mat, rhs_shared_mat,
-    //                                  out_shared_mat.data);
     mma_m16n16k16_f16_f32_ptx(lhs_shared_mat.data, rhs_shared_mat.data,
                               out_shared_mat.data);
   }
   __syncthreads();
 
-  for (int m = 0; m < CEIL_DIV(M_TILE, 2); m++) {
-#pragma unroll
-    out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-        .tile(Coord(m, 0), Coord(2, 16))
-      <= out_shared_mat.tile(Coord(m, 0), Coord(2, 16));
-  }
+  out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+    <= out_shared_mat;
 }
 
 void matmul_tensor_cores_wmma_m16n16k16_f16f32(int M, int N, int K, float alpha,

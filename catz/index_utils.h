@@ -311,9 +311,12 @@ template <typename T> struct Matrix {
     int col_this = thread_id % shape.y;
     int row_other = thread_id / other.shape.y;
     int col_other = thread_id % other.shape.y;
-    for (int i = 0; i < total_elements; i += total_threads)
-      (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
-        = ((other.data))[i * other.stride.x / other.shape.y
+// TODO: make this config more general
+#pragma unroll 8
+    for (int i = 0; i < total_elements / total_threads; i++)
+      (data)[i * total_threads * stride.x / shape.y + row_this * stride.x
+             + col_this]
+        = ((other.data))[i * total_threads * other.stride.x / other.shape.y
                          + row_other * other.stride.x + col_other];
     // if (total_threads * 4 < total_elements) {
     //   total_elements = total_elements / 4;
@@ -338,7 +341,12 @@ template <typename T> struct Matrix {
     // }
   }
 
-  // use all threads to move
+  //   for (int m = 0; m < 8/* CEIL_DIV(M_TILE, 2) */; m++) {
+  //     lhs_shared_mat.tile(Coord(m, kin), Coord(2, 16)).dist_to_thread()
+  //       = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+  //           .tile(Coord(m, kin), Coord(2, 16))
+  //           .dist_to_thread();
+  //   }
   template <typename U = T>
   inline __device__
     typename std::enable_if<std::is_same<U, half>::value, void>::type
@@ -351,10 +359,38 @@ template <typename T> struct Matrix {
     int col_this = thread_id % shape.y;
     int row_other = thread_id / other.shape.y;
     int col_other = thread_id % other.shape.y;
-    for (int i = 0; i < total_elements; i += total_threads)
-      (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
-        = ((other.data))[i * other.stride.x / other.shape.y
+
+    // OPTION I: normalised loop, with full symbolic index calculation
+    // ~ 4180 GFLOPS
+#pragma unroll 8
+    for (int i = 0; i < total_elements / total_threads; i++)
+      (data)[i * total_threads * stride.x / shape.y + row_this * stride.x
+             + col_this]
+        = ((other.data))[i * total_threads * other.stride.x / other.shape.y
                          + row_other * other.stride.x + col_other];
+
+    // OPTION II: non-normalised loop, with full symbolic index calculation
+    // ~ 1940 GFLOPS
+    // for (int i = 0; i < total_elements; i+=total_threads)
+    //   (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
+    //     = ((other.data))[i * other.stride.x / other.shape.y
+    //                      + row_other * other.stride.x + col_other];
+
+    // OPTION II: non-normalised loop, with full symbolic index calculation
+    // ~ 2800 GFLOPS
+    // for (int i = 0; i < total_elements; i+=32)
+    //   (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
+    //     = ((other.data))[i * other.stride.x / other.shape.y
+    //                      + row_other * other.stride.x + col_other];
+
+    // OPTION II: non-normalised loop, with more-of-literal calculation
+    // ~ 2790 GFLOPS
+    //
+    // for (int i = 0; i < 256; i+=32)
+    //   (data)[i * 16 / shape.y + row_this * 16 + col_this]
+    //     = ((other.data))[i * 4096 / other.shape.y
+    //                      + row_other * 4096 + col_other];
+
     // if (total_threads * 4 < total_elements) {
     //   total_elements = total_elements / 4;
     //   for (int i = 0; i < total_elements; i += total_threads)
