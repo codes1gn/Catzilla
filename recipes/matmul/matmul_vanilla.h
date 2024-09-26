@@ -6,8 +6,8 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#include "index_utils.h"
 #include "macros.h"
+#include "matrix_utils.h"
 #include "micro_kernels.h"
 #include "micro_kernels/cuda_kernels.h"
 

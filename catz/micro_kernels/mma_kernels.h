@@ -9,7 +9,7 @@
 #include <mma.h>
 
 #include "cuda_utils.h"
-#include "index_utils.h"
+#include "matrix_utils.h"
 
 using namespace catz;
 

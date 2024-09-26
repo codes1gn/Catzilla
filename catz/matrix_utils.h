@@ -38,7 +38,7 @@ struct is_allowed_type
 // distribute_(tid_x*N_TILE_REG, tid_y*M_TILE_REG, 1, N) + distribute_(m_reg,
 // n_reg, N, 1)]
 //
-// novel:
+// stream-like:
 // lhs.tiling_(xxx).distribute_(xx)
 // rhs.tiling_(xxx).tiling_(xxx).distribute_(xx)
 inline __device__ int distribute_(int x_offset, int y_offset, int x_stride,
@@ -61,56 +61,57 @@ inline __device__ int tiling_(int tile_id_x, int tile_id_y, int to_stride_x,
 // template<int X, int Y>
 // TODO: rename to row, col, not x, y
 struct Coord {
-  int x;
-  int y;
+  int first;
+  int second;
 
   // 构造函数
-  __device__ Coord(int x, int y)
-      : x(x)
-      , y(y)
+  __device__ Coord(int first, int second)
+      : first(first)
+      , second(second)
   {
   }
 
   // 从 std::tuple<int, int> 构造
   __device__ Coord(const std::tuple<int, int> &t)
-      : x(std::get<0>(t))
-      , y(std::get<1>(t))
+      : first(std::get<0>(t))
+      , second(std::get<1>(t))
   {
   }
 
   // 将 Coord 转换为 std::tuple<int, int>
   __device__ std::tuple<int, int> to_tuple() const
   {
-    return std::make_tuple(x, y);
+    return std::make_tuple(first, second);
   }
 
   __device__ Coord &xor_swizzle()
   {
-    auto i16 = (y * 32 + x) * sizeof(float) / 16;
+    auto i16 = (first * 32 + second) * sizeof(float) / 16;
     auto y16 = i16 / 8;
     auto x16 = i16 % 8;
     auto x16_swz = y16 ^ x16;
-    auto x_swz = x16_swz * 16 / sizeof(float) % 32 + x % (16 / sizeof(float));
-    x = x_swz % 32;
-    y = x_swz / 32;
+    auto x_swz
+      = x16_swz * 16 / sizeof(float) % 32 + second % (16 / sizeof(float));
+    second = x_swz % 32;
+    first = x_swz / 32;
     return *this;
   }
 
   __device__ Coord &xor_swizzle_col()
   {
-    auto i = (x * 16 + y);
-    auto i_swz = (x * 16 + y) ^ x;
-    y = i_swz % 16;
-    x = i_swz / 16;
+    auto i = (first * 16 + second);
+    auto i_swz = (first * 16 + second) ^ first;
+    second = i_swz % 16;
+    first = i_swz / 16;
     return *this;
   }
 
   __device__ Coord &xor_swizzle_row()
   {
-    auto i = (x * 16 + y);
-    auto i_swz = (x * 16 + y) ^ y;
-    y = i_swz % 16;
-    x = i_swz / 16;
+    auto i = (first * 16 + second);
+    auto i_swz = (first * 16 + second) ^ second;
+    second = i_swz % 16;
+    first = i_swz / 16;
     return *this;
   }
 };
@@ -127,7 +128,7 @@ template <typename T> struct Matrix {
   __device__ Matrix(T *data, Coord shape)
       : data(data)
       , shape(shape)
-      , stride(Coord(shape.y, 1))
+      , stride(Coord(shape.second, 1))
   {
   }
 
@@ -162,9 +163,9 @@ template <typename T> struct Matrix {
   inline __device__ void fill(T value)
   {
     int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
-    int row_in_current = flat_id / shape.y;
-    int col_in_current = flat_id % shape.y;
-    int elements = shape.x * shape.y;
+    int row_in_current = flat_id / shape.second;
+    int col_in_current = flat_id % shape.second;
+    int elements = shape.first * shape.second;
     int threads = blockDim.x * blockDim.y;
     for (int chunk = 0; chunk < CEIL_DIV(elements, threads); chunk++) {
       data[chunk * threads + flat_id] = value;
@@ -179,26 +180,26 @@ template <typename T> struct Matrix {
   {
     // TODO: add loader length check
     int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
-    int lane_rank = lane_id % shape.x;
-    int lane_group = lane_id / shape.x;
-    const half *data_ptr = data + lane_rank * stride.x + lane_group * 8;
-    if (shape.x == 16 && shape.y == 8) {
+    int lane_rank = lane_id % shape.first;
+    int lane_group = lane_id / shape.first;
+    const half *data_ptr = data + lane_rank * stride.first + lane_group * 8;
+    if (shape.first == 16 && shape.second == 8) {
       // LHS X2
       asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
                    : "=r"(loader[0]), "=r"(loader[1])
                    : "r"(get_smem_ptr(data_ptr)));
-    } else if (shape.x == 16 && shape.y == 16) {
+    } else if (shape.first == 16 && shape.second == 16) {
       // RHS X1
       asm volatile(
         "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
         : "=r"(loader[0]), "=r"(loader[1]), "=r"(loader[2]), "=r"(loader[3])
         : "r"(get_smem_ptr(data_ptr)));
-    } else if (shape.x == 8 && shape.y == 8) {
+    } else if (shape.first == 8 && shape.second == 8) {
       // LHS X4
       asm volatile("ldmatrix.sync.aligned.m8n8.x1.trans.shared.b16 {%0}, [%1];"
                    : "=r"(loader[0])
                    : "r"(get_smem_ptr(data_ptr)));
-    } else if (shape.x == 8 && shape.y == 16) {
+    } else if (shape.first == 8 && shape.second == 16) {
       // RHS X2
       asm volatile(
         "ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 {%0, %1}, [%2];"
@@ -213,13 +214,13 @@ template <typename T> struct Matrix {
     load_fragments_c(float *loader)
   {
     int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
-    if (shape.x == 16 && shape.y == 8) {
-      loader[0] = data[(lane_id / 4) * stride.x + (lane_id % 4) * 2];
-      loader[1] = data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 1];
-      loader[2]
-        = data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 8 * stride.x];
-      loader[3]
-        = data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 8 * stride.x + 1];
+    if (shape.first == 16 && shape.second == 8) {
+      loader[0] = data[(lane_id / 4) * stride.first + (lane_id % 4) * 2];
+      loader[1] = data[(lane_id / 4) * stride.first + (lane_id % 4) * 2 + 1];
+      loader[2] = data[(lane_id / 4) * stride.first + (lane_id % 4) * 2
+                       + 8 * stride.first];
+      loader[3] = data[(lane_id / 4) * stride.first + (lane_id % 4) * 2
+                       + 8 * stride.first + 1];
     }
   }
 
@@ -229,21 +230,23 @@ template <typename T> struct Matrix {
     store_fragments_c(float *storer)
   {
     int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
-    if (shape.x == 16 && shape.y == 8) {
-      data[(lane_id / 4) * stride.x + (lane_id % 4) * 2] = storer[0];
-      data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 1] = storer[1];
-      data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 8 * stride.x]
+    if (shape.first == 16 && shape.second == 8) {
+      data[(lane_id / 4) * stride.first + (lane_id % 4) * 2] = storer[0];
+      data[(lane_id / 4) * stride.first + (lane_id % 4) * 2 + 1] = storer[1];
+      data[(lane_id / 4) * stride.first + (lane_id % 4) * 2 + 8 * stride.first]
         = storer[2];
-      data[(lane_id / 4) * stride.x + (lane_id % 4) * 2 + 8 * stride.x + 1]
+      data[(lane_id / 4) * stride.first + (lane_id % 4) * 2 + 8 * stride.first
+           + 1]
         = storer[3];
     }
   }
 
   inline __device__ Matrix tile(Coord tile_var, Coord other_shape)
   {
-    Matrix ret = Matrix(data + tile_var.x * other_shape.x * stride.x
-                          + tile_var.y * other_shape.y * stride.y,
-                        other_shape, stride);
+    Matrix ret
+      = Matrix(data + tile_var.first * other_shape.first * stride.first
+                 + tile_var.second * other_shape.second * stride.second,
+               other_shape, stride);
     return std::move(ret);
   }
 
@@ -251,18 +254,19 @@ template <typename T> struct Matrix {
   {
     // shape = 8 x 2
     // y in 0-4, x in 0-4
-    Matrix ret = Matrix(data + tile_var.x * stride.x + tile_var.y * stride.y,
+    Matrix ret = Matrix(data + tile_var.first * stride.first
+                          + tile_var.second * stride.second,
                         shape, stride);
     return std::move(ret);
   }
 
   inline __device__ Matrix dist_to(int dist_id)
   {
-    int row_in_current = dist_id / shape.y;
-    int col_in_current = dist_id % shape.y;
-    Matrix ret
-      = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
-               shape, stride);
+    int row_in_current = dist_id / shape.second;
+    int col_in_current = dist_id % shape.second;
+    Matrix ret = Matrix(data + row_in_current * stride.first
+                          + col_in_current * stride.second,
+                        shape, stride);
     return std::move(ret);
   }
 
@@ -275,11 +279,11 @@ template <typename T> struct Matrix {
     // 3. use a wrap to spread.
     // we prefer to take third option in currently design
     int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
-    int row_in_current = lane_id / shape.y;
-    int col_in_current = lane_id % shape.y;
-    Matrix ret
-      = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
-               shape, stride);
+    int row_in_current = lane_id / shape.second;
+    int col_in_current = lane_id % shape.second;
+    Matrix ret = Matrix(data + row_in_current * stride.first
+                          + col_in_current * stride.second,
+                        shape, stride);
     return std::move(ret);
   }
 
@@ -292,11 +296,11 @@ template <typename T> struct Matrix {
     // 3. use a wrap to spread.
     // we prefer to take third option in currently design
     int lane_id = threadIdx.y * blockDim.x + threadIdx.x;
-    int row_in_current = lane_id / shape.y;
-    int col_in_current = lane_id % shape.y;
-    Matrix ret
-      = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
-               shape, stride);
+    int row_in_current = lane_id / shape.second;
+    int col_in_current = lane_id % shape.second;
+    Matrix ret = Matrix(data + row_in_current * stride.first
+                          + col_in_current * stride.second,
+                        shape, stride);
     return std::move(ret);
   }
 
@@ -305,39 +309,42 @@ template <typename T> struct Matrix {
   inline __device__ void operator<=(const Matrix &other)
   {
     int total_threads = blockDim.x * blockDim.y;
-    int total_elements = shape.x * shape.y;
+    int total_elements = shape.first * shape.second;
     int thread_id = threadIdx.y * blockDim.x + threadIdx.x;
-    int row_this = thread_id / shape.y;
-    int col_this = thread_id % shape.y;
-    int row_other = thread_id / other.shape.y;
-    int col_other = thread_id % other.shape.y;
+    int row_this = thread_id / shape.second;
+    int col_this = thread_id % shape.second;
+    int row_other = thread_id / other.shape.second;
+    int col_other = thread_id % other.shape.second;
 // TODO: make this config more general
 #pragma unroll 8
     for (int i = 0; i < total_elements / total_threads; i++)
-      (data)[i * total_threads * stride.x / shape.y + row_this * stride.x
-             + col_this]
-        = ((other.data))[i * total_threads * other.stride.x / other.shape.y
-                         + row_other * other.stride.x + col_other];
+      (data)[i * total_threads * stride.first / shape.second
+             + row_this * stride.first + col_this]
+        = ((other.data))[i * total_threads * other.stride.first
+                           / other.shape.second
+                         + row_other * other.stride.first + col_other];
     // if (total_threads * 4 < total_elements) {
     //   total_elements = total_elements / 4;
-    //   int row_this = thread_id / (shape.y / 4);
-    //   int col_this = thread_id % (shape.y / 4);
-    //   int row_other = thread_id / (other.shape.y / 4);
-    //   int col_other = thread_id % (other.shape.y / 4);
+    //   int row_this = thread_id / (shape.second / 4);
+    //   int col_this = thread_id % (shape.second / 4);
+    //   int row_other = thread_id / (other.shape.second / 4);
+    //   int col_other = thread_id % (other.shape.second / 4);
     //   for (int i = 0; i < total_elements; i += total_threads)
-    //     ((float4*)data)[i * stride.x / shape.y + row_this * stride.x +
-    //     col_this]
-    //       = ((float4*)(other.data))[i * other.stride.x / other.shape.y
-    //                    + row_other * other.stride.x / 4 + col_other];
+    //     ((float4*)data)[i * stride.first / shape.second + row_this *
+    //     stride.first + col_this]
+    //       = ((float4*)(other.data))[i * other.stride.first /
+    //       other.shape.second
+    //                    + row_other * other.stride.first / 4 + col_other];
     // } else {
-    //   int row_this = thread_id / shape.y;
-    //   int col_this = thread_id % shape.y;
-    //   int row_other = thread_id / other.shape.y;
-    //   int col_other = thread_id % other.shape.y;
+    //   int row_this = thread_id / shape.second;
+    //   int col_this = thread_id % shape.second;
+    //   int row_other = thread_id / other.shape.second;
+    //   int col_other = thread_id % other.shape.second;
     //   for (int i = 0; i < total_elements; i += total_threads)
-    //     (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
-    //       = ((other.data))[i * other.stride.x / other.shape.y
-    //                    + row_other * other.stride.x + col_other];
+    //     (data)[i * stride.first / shape.second + row_this * stride.first +
+    //     col_this]
+    //       = ((other.data))[i * other.stride.first / other.shape.second
+    //                    + row_other * other.stride.first + col_other];
     // }
   }
 
@@ -353,56 +360,61 @@ template <typename T> struct Matrix {
     operator<=(const Matrix<float> &other)
   {
     int total_threads = blockDim.x * blockDim.y;
-    int total_elements = shape.x * shape.y;
+    int total_elements = shape.first * shape.second;
     int thread_id = threadIdx.x + threadIdx.y * blockDim.x;
-    int row_this = thread_id / shape.y;
-    int col_this = thread_id % shape.y;
-    int row_other = thread_id / other.shape.y;
-    int col_other = thread_id % other.shape.y;
+    int row_this = thread_id / shape.second;
+    int col_this = thread_id % shape.second;
+    int row_other = thread_id / other.shape.second;
+    int col_other = thread_id % other.shape.second;
 
     // OPTION I: normalised loop, with full symbolic index calculation
     // ~ 4180 GFLOPS
 #pragma unroll 8
     for (int i = 0; i < total_elements / total_threads; i++)
-      (data)[i * total_threads * stride.x / shape.y + row_this * stride.x
-             + col_this]
-        = ((other.data))[i * total_threads * other.stride.x / other.shape.y
-                         + row_other * other.stride.x + col_other];
+      (data)[i * total_threads * stride.first / shape.second
+             + row_this * stride.first + col_this]
+        = ((other.data))[i * total_threads * other.stride.first
+                           / other.shape.second
+                         + row_other * other.stride.first + col_other];
 
     // OPTION II: non-normalised loop, with full symbolic index calculation
     // ~ 1940 GFLOPS
     // for (int i = 0; i < total_elements; i+=total_threads)
-    //   (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
-    //     = ((other.data))[i * other.stride.x / other.shape.y
-    //                      + row_other * other.stride.x + col_other];
+    //   (data)[i * stride.first / shape.second + row_this * stride.first +
+    //   col_this]
+    //     = ((other.data))[i * other.stride.first / other.shape.second
+    //                      + row_other * other.stride.first + col_other];
 
     // OPTION II: non-normalised loop, with full symbolic index calculation
     // ~ 2800 GFLOPS
     // for (int i = 0; i < total_elements; i+=32)
-    //   (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
-    //     = ((other.data))[i * other.stride.x / other.shape.y
-    //                      + row_other * other.stride.x + col_other];
+    //   (data)[i * stride.first / shape.second + row_this * stride.first +
+    //   col_this]
+    //     = ((other.data))[i * other.stride.first / other.shape.second
+    //                      + row_other * other.stride.first + col_other];
 
     // OPTION II: non-normalised loop, with more-of-literal calculation
     // ~ 2790 GFLOPS
     //
     // for (int i = 0; i < 256; i+=32)
-    //   (data)[i * 16 / shape.y + row_this * 16 + col_this]
-    //     = ((other.data))[i * 4096 / other.shape.y
+    //   (data)[i * 16 / shape.second + row_this * 16 + col_this]
+    //     = ((other.data))[i * 4096 / other.shape.second
     //                      + row_other * 4096 + col_other];
 
     // if (total_threads * 4 < total_elements) {
     //   total_elements = total_elements / 4;
     //   for (int i = 0; i < total_elements; i += total_threads)
-    //     ((float4*)data)[i * stride.x / shape.y + row_this * stride.x +
-    //     col_this]
-    //       = ((float4*)(other.data))[i * other.stride.x / other.shape.y
-    //                    + row_other * other.stride.x + col_other];
+    //     ((float4*)data)[i * stride.first / shape.second + row_this *
+    //     stride.first + col_this]
+    //       = ((float4*)(other.data))[i * other.stride.first /
+    //       other.shape.second
+    //                    + row_other * other.stride.first + col_other];
     // } else {
     //   for (int i = 0; i < total_elements; i += total_threads)
-    //     (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
-    //       = ((other.data))[i * other.stride.x / other.shape.y
-    //                    + row_other * other.stride.x + col_other];
+    //     (data)[i * stride.first / shape.second + row_this * stride.first +
+    //     col_this]
+    //       = ((other.data))[i * other.stride.first / other.shape.second
+    //                    + row_other * other.stride.first + col_other];
     // }
   }
 
@@ -421,18 +433,18 @@ template <typename T> struct Matrix {
   {
     int total_threads = blockDim.x;
     // int total_threads = blockDim.x * blockDim.y;
-    int total_elements = shape.x * shape.y;
+    int total_elements = shape.first * shape.second;
     int thread_id = (threadIdx.x + threadIdx.y * blockDim.x) % 32;
     // int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
-    int row_this = thread_id / shape.y;
-    int col_this = thread_id % shape.y;
-    int row_other = thread_id / other.shape.y;
-    int col_other = thread_id % other.shape.y;
+    int row_this = thread_id / shape.second;
+    int col_this = thread_id % shape.second;
+    int row_other = thread_id / other.shape.second;
+    int col_other = thread_id % other.shape.second;
     // #pragma unroll
     for (int i = 0; i < total_elements; i += total_threads) {
-      data[i * stride.x / shape.y + row_this * stride.x + col_this]
-        = other.data[i * other.stride.x / other.shape.y
-                     + row_other * other.stride.x + col_other];
+      data[i * stride.first / shape.second + row_this * stride.first + col_this]
+        = other.data[i * other.stride.first / other.shape.second
+                     + row_other * other.stride.first + col_other];
     }
   }
   template <typename U = T>
@@ -442,17 +454,18 @@ template <typename T> struct Matrix {
   {
     int total_threads = blockDim.x;
     // int total_threads = blockDim.x * blockDim.y;
-    int total_elements = shape.x * shape.y;
+    int total_elements = shape.first * shape.second;
     int thread_id = (threadIdx.x + threadIdx.y * blockDim.x) % 32;
-    int row_this = thread_id / shape.y;
-    int col_this = thread_id % shape.y;
-    int row_other = thread_id / other.shape.y;
-    int col_other = thread_id % other.shape.y;
+    int row_this = thread_id / shape.second;
+    int col_this = thread_id % shape.second;
+    int row_other = thread_id / other.shape.second;
+    int col_other = thread_id % other.shape.second;
     // #pragma unroll
     for (int i = 0; i < total_elements; i += total_threads) {
-      data[i * stride.x / shape.y + row_this * stride.x + col_this]
-        = __float2half(other.data[i * other.stride.x / other.shape.y
-                                  + row_other * other.stride.x + col_other]);
+      data[i * stride.first / shape.second + row_this * stride.first + col_this]
+        = __float2half(
+          other.data[i * other.stride.first / other.shape.second
+                     + row_other * other.stride.first + col_other]);
     }
   }
 
@@ -494,9 +507,9 @@ template <typename T> struct Matrix {
   __device__ typename std::enable_if<std::is_same<U, float>::value, void>::type
   print() const
   {
-    for (size_t i = 0; i < shape.x; ++i) {
-      for (size_t j = 0; j < shape.y; ++j) {
-        std::cout << data[i * shape.x + j * shape.y] << " ";
+    for (size_t i = 0; i < shape.first; ++i) {
+      for (size_t j = 0; j < shape.second; ++j) {
+        std::cout << data[i * shape.first + j * shape.second] << " ";
       }
       std::cout << "\n";
     }
