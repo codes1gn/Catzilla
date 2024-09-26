@@ -9,6 +9,7 @@
 
 ======================= TODO ==============================
 
+*. matmul_tensor_cores_tuned.h, line 151, bug, still slower with <=
 *. make one faster kernel, not limit to. (need to pack fragment loading in Matrix design)
 *. add cp.async
 *. integrate to choreo // next week

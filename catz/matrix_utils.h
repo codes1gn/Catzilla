@@ -315,8 +315,11 @@ template <typename T> struct Matrix {
     int col_this = thread_id % shape.second;
     int row_other = thread_id / other.shape.second;
     int col_other = thread_id % other.shape.second;
-// TODO: make this config more general
-#pragma unroll 8
+
+    // TODO: make this config more general
+    // #pragma unroll 8
+    // compile-time symbolic index calc, become perf drop
+#pragma unroll
     for (int i = 0; i < total_elements / total_threads; i++)
       (data)[i * total_threads * stride.first / shape.second
              + row_this * stride.first + col_this]

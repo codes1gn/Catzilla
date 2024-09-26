@@ -6,6 +6,7 @@
 #include "matmul/matmul_padswizzled.h"
 #include "matmul/matmul_refactored.h"
 #include "matmul/matmul_tensor_cores.h"
+#include "matmul/matmul_tensor_cores_tuned.h"
 #include "matmul/matmul_vanilla.h"
 #include "matmul/matmul_vload_vstore.h"
 
@@ -52,6 +53,9 @@ inline void matmul_exec(int impl_idx, int M, int N, int K, float alpha,
   } else if (impl_idx == 14) {
     // improved from k11
     matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(M, N, K, alpha, A, B, beta, C);
+  } else if (impl_idx == 15) {
+    // improved from k11
+    matmul_tuned_with_mma_kernel(M, N, K, alpha, A, B, beta, C);
   } else {
     printf("[ERROR] kernel id not exists\n");
     exit(EXIT_FAILURE);
