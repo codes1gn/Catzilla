@@ -153,51 +153,10 @@ template <typename T> struct Matrix {
     other.data = nullptr;
   }
 
-  __device__ Matrix inc(int value)
+  __device__ Matrix next()
   {
-    data += value;
+    data += 1;
     return *this;
-  }
-
-  inline __device__ Matrix distribute(Coord id, Coord stride)
-  {
-    Matrix ret = Matrix(data + id.x * stride.x + id.y * stride.y, shape);
-    return std::move(ret);
-  }
-
-  inline __device__ Matrix tile(Coord id, Coord from_stride, Coord to_stride)
-  {
-    Matrix ret = Matrix(data + id.x * from_stride.x * to_stride.x
-                          + id.y * from_stride.y * to_stride.y,
-                        shape);
-    return std::move(ret);
-  }
-
-  inline __device__ Matrix tile_ex(Coord tile_var, Coord other_shape)
-  {
-    Matrix ret = Matrix(data + tile_var.x * other_shape.x * stride.x
-                          + tile_var.y * other_shape.y * stride.y,
-                        other_shape, stride);
-    return std::move(ret);
-  }
-
-  inline __device__ Matrix dist_ex(Coord tile_var)
-  {
-    // shape = 8 x 2
-    // y in 0-4, x in 0-4
-    Matrix ret = Matrix(data + tile_var.x * stride.x + tile_var.y * stride.y,
-                        shape, stride);
-    return std::move(ret);
-  }
-
-  inline __device__ Matrix dist_flatten(int flat_id)
-  {
-    int row_in_current = flat_id / shape.y;
-    int col_in_current = flat_id % shape.y;
-    Matrix ret
-      = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
-               shape, stride);
-    return std::move(ret);
   }
 
   inline __device__ void fill(T value)
@@ -280,6 +239,34 @@ template <typename T> struct Matrix {
     }
   }
 
+  inline __device__ Matrix tile(Coord tile_var, Coord other_shape)
+  {
+    Matrix ret = Matrix(data + tile_var.x * other_shape.x * stride.x
+                          + tile_var.y * other_shape.y * stride.y,
+                        other_shape, stride);
+    return std::move(ret);
+  }
+
+  inline __device__ Matrix dist_to(Coord tile_var)
+  {
+    // shape = 8 x 2
+    // y in 0-4, x in 0-4
+    Matrix ret = Matrix(data + tile_var.x * stride.x + tile_var.y * stride.y,
+                        shape, stride);
+    return std::move(ret);
+  }
+
+  inline __device__ Matrix dist_to(int dist_id)
+  {
+    int row_in_current = dist_id / shape.y;
+    int col_in_current = dist_id % shape.y;
+    Matrix ret
+      = Matrix(data + row_in_current * stride.x + col_in_current * stride.y,
+               shape, stride);
+    return std::move(ret);
+  }
+
+  // distribute the following 32 elements to a wrap
   inline __device__ Matrix dist_to_wrap()
   {
     // NOTE: we can have three design
@@ -296,6 +283,7 @@ template <typename T> struct Matrix {
     return std::move(ret);
   }
 
+  // distribute the following NUM_THREADS elements to all threads
   inline __device__ Matrix dist_to_thread()
   {
     // NOTE: we can have three design
@@ -312,8 +300,85 @@ template <typename T> struct Matrix {
     return std::move(ret);
   }
 
-  // TODO: add dist_to(what)
+  // operator '<=' is syntax sugar that combines dist-to-threads and '='
+  // operator
+  inline __device__ void operator<=(const Matrix &other)
+  {
+    int total_threads = blockDim.x * blockDim.y;
+    int total_elements = shape.x * shape.y;
+    int thread_id = threadIdx.y * blockDim.x + threadIdx.x;
+    int row_this = thread_id / shape.y;
+    int col_this = thread_id % shape.y;
+    int row_other = thread_id / other.shape.y;
+    int col_other = thread_id % other.shape.y;
+    for (int i = 0; i < total_elements; i += total_threads)
+      (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
+        = ((other.data))[i * other.stride.x / other.shape.y
+                         + row_other * other.stride.x + col_other];
+    // if (total_threads * 4 < total_elements) {
+    //   total_elements = total_elements / 4;
+    //   int row_this = thread_id / (shape.y / 4);
+    //   int col_this = thread_id % (shape.y / 4);
+    //   int row_other = thread_id / (other.shape.y / 4);
+    //   int col_other = thread_id % (other.shape.y / 4);
+    //   for (int i = 0; i < total_elements; i += total_threads)
+    //     ((float4*)data)[i * stride.x / shape.y + row_this * stride.x +
+    //     col_this]
+    //       = ((float4*)(other.data))[i * other.stride.x / other.shape.y
+    //                    + row_other * other.stride.x / 4 + col_other];
+    // } else {
+    //   int row_this = thread_id / shape.y;
+    //   int col_this = thread_id % shape.y;
+    //   int row_other = thread_id / other.shape.y;
+    //   int col_other = thread_id % other.shape.y;
+    //   for (int i = 0; i < total_elements; i += total_threads)
+    //     (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
+    //       = ((other.data))[i * other.stride.x / other.shape.y
+    //                    + row_other * other.stride.x + col_other];
+    // }
+  }
 
+  // use all threads to move
+  template <typename U = T>
+  inline __device__
+    typename std::enable_if<std::is_same<U, half>::value, void>::type
+    operator<=(const Matrix<float> &other)
+  {
+    int total_threads = blockDim.x * blockDim.y;
+    int total_elements = shape.x * shape.y;
+    int thread_id = threadIdx.x + threadIdx.y * blockDim.x;
+    int row_this = thread_id / shape.y;
+    int col_this = thread_id % shape.y;
+    int row_other = thread_id / other.shape.y;
+    int col_other = thread_id % other.shape.y;
+    for (int i = 0; i < total_elements; i += total_threads)
+      (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
+        = ((other.data))[i * other.stride.x / other.shape.y
+                         + row_other * other.stride.x + col_other];
+    // if (total_threads * 4 < total_elements) {
+    //   total_elements = total_elements / 4;
+    //   for (int i = 0; i < total_elements; i += total_threads)
+    //     ((float4*)data)[i * stride.x / shape.y + row_this * stride.x +
+    //     col_this]
+    //       = ((float4*)(other.data))[i * other.stride.x / other.shape.y
+    //                    + row_other * other.stride.x + col_other];
+    // } else {
+    //   for (int i = 0; i < total_elements; i += total_threads)
+    //     (data)[i * stride.x / shape.y + row_this * stride.x + col_this]
+    //       = ((other.data))[i * other.stride.x / other.shape.y
+    //                    + row_other * other.stride.x + col_other];
+    // }
+  }
+
+  // TODO: merge it
+  // use threads in one wrap to move it,
+  // replace m with threadIdx.y
+  //
+  // for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
+  //   out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
+  //       .tile(Coord(m, n), out_reg_tile_shape)
+  //     <<= out_shared_mat.tile(Coord(m, n), out_reg_tile_shape);
+  // }
   // special operator that allows any same-volume copy, when the volume is
   // dividable by threads volume
   inline __device__ void operator<<=(const Matrix &other)
@@ -334,25 +399,6 @@ template <typename T> struct Matrix {
                      + row_other * other.stride.x + col_other];
     }
   }
-
-  inline __device__ void operator<=(const Matrix &other)
-  {
-    int total_threads = blockDim.x * blockDim.y;
-    int total_elements = shape.x * shape.y;
-    int thread_id = threadIdx.y * blockDim.x + threadIdx.x;
-    int row_this = thread_id / shape.y;
-    int col_this = thread_id % shape.y;
-    int row_other = thread_id / other.shape.y;
-    int col_other = thread_id % other.shape.y;
-    // #pragma unroll
-    for (int i = 0; i < total_elements; i += total_threads) {
-      data[i * stride.x / shape.y + row_this * stride.x + col_this]
-        = other.data[i * other.stride.x / other.shape.y
-                     + row_other * other.stride.x + col_other];
-    }
-  }
-  // TODO: merge it
-  // use threads in one wrap to move it
   template <typename U = T>
   inline __device__
     typename std::enable_if<std::is_same<U, half>::value, void>::type
@@ -362,27 +408,6 @@ template <typename T> struct Matrix {
     // int total_threads = blockDim.x * blockDim.y;
     int total_elements = shape.x * shape.y;
     int thread_id = (threadIdx.x + threadIdx.y * blockDim.x) % 32;
-    int row_this = thread_id / shape.y;
-    int col_this = thread_id % shape.y;
-    int row_other = thread_id / other.shape.y;
-    int col_other = thread_id % other.shape.y;
-    // #pragma unroll
-    for (int i = 0; i < total_elements; i += total_threads) {
-      data[i * stride.x / shape.y + row_this * stride.x + col_this]
-        = __float2half(other.data[i * other.stride.x / other.shape.y
-                                  + row_other * other.stride.x + col_other]);
-    }
-  }
-
-  // use all threads to move
-  template <typename U = T>
-  inline __device__
-    typename std::enable_if<std::is_same<U, half>::value, void>::type
-    operator<=(const Matrix<float> &other)
-  {
-    int total_threads = blockDim.x * blockDim.y;
-    int total_elements = shape.x * shape.y;
-    int thread_id = threadIdx.x + threadIdx.y * blockDim.x;
     int row_this = thread_id / shape.y;
     int col_this = thread_id % shape.y;
     int row_other = thread_id / other.shape.y;

@@ -254,18 +254,18 @@ for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
       for (int kin = 0; kin < CEIL_DIV(K_TILE, 16); kin++) {
         // use .tile(tile_var: Coord, tile_shape: Coord) to slice a memview from memory
         // when the tile slice has 32 elements, use .dist_to_thread() to map each thread to a data loc.
-        lhs_shared_mat.tile_ex(Coord(m, kin), Coord(2, 16)).dist_to_thread()
-          = lhs_mat.tile_ex(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-              .tile_ex(Coord(m, kin), Coord(2, 16))
+        lhs_shared_mat.tile(Coord(m, kin), Coord(2, 16)).dist_to_thread()
+          = lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+              .tile(Coord(m, kin), Coord(2, 16))
               .dist_to_thread();
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, 4); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, 8); n++) {
-        rhs_shared_mat.tile_ex(Coord(kin, n), Coord(4, 8)).dist_to_thread()
-          = rhs_mat.tile_ex(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-              .tile_ex(Coord(kin, n), Coord(4, 8))
+        rhs_shared_mat.tile(Coord(kin, n), Coord(4, 8)).dist_to_thread()
+          = rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+              .tile(Coord(kin, n), Coord(4, 8))
               .dist_to_thread();
       }
     }

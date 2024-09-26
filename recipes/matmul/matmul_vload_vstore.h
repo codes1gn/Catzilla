@@ -89,16 +89,16 @@ __global__ void _matmul_vload_vstore(int M, int N, int K, float alpha,
 #pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
         // lhs_shared_mat
-        //   .tile_ex(Coord(m, kin), lhs_reg_tile_shape)
+        //   .tile(Coord(m, kin), lhs_reg_tile_shape)
         //   .dist_to_thread()
         //   = lhs_mat
-        //   .tile_ex(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-        //     .tile_ex(Coord(m, kin), lhs_reg_tile_shape)
+        //   .tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+        //     .tile(Coord(m, kin), lhs_reg_tile_shape)
         //     .dist_to_thread();
-        lhs_shared_mat_v.tile_ex(Coord(m, kin), lhs_reg_tile_shape_v)
+        lhs_shared_mat_v.tile(Coord(m, kin), lhs_reg_tile_shape_v)
           .dist_to_thread()
-          = lhs_mat_v.tile_ex(Coord(blockIdx.y, ko), lhs_sm_tile_shape_v)
-              .tile_ex(Coord(m, kin), lhs_reg_tile_shape_v)
+          = lhs_mat_v.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape_v)
+              .tile(Coord(m, kin), lhs_reg_tile_shape_v)
               .dist_to_thread();
       }
     }
@@ -106,16 +106,16 @@ __global__ void _matmul_vload_vstore(int M, int N, int K, float alpha,
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
         // rhs_shared_mat
-        //   .tile_ex(Coord(kin, n), rhs_reg_tile_shape)
+        //   .tile(Coord(kin, n), rhs_reg_tile_shape)
         //   .dist_to_thread()
         //   = rhs_mat
-        //   .tile_ex(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
-        //   .tile_ex(Coord(kin, n), rhs_reg_tile_shape)
+        //   .tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
+        //   .tile(Coord(kin, n), rhs_reg_tile_shape)
         //   .dist_to_thread();
-        rhs_shared_mat_v.tile_ex(Coord(kin, n), rhs_reg_tile_shape_v)
+        rhs_shared_mat_v.tile(Coord(kin, n), rhs_reg_tile_shape_v)
           .dist_to_thread()
-          = rhs_mat_v.tile_ex(Coord(ko, blockIdx.x), rhs_sm_tile_shape_v)
-              .tile_ex(Coord(kin, n), rhs_reg_tile_shape_v)
+          = rhs_mat_v.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape_v)
+              .tile(Coord(kin, n), rhs_reg_tile_shape_v)
               .dist_to_thread();
       }
     }
@@ -131,10 +131,10 @@ __global__ void _matmul_vload_vstore(int M, int N, int K, float alpha,
   for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
 #pragma unroll
     for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-      out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-        .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
+      out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+        .tile(Coord(m, n), Coord(Y_THREAD, X_THREAD))
         .dist_to_thread()
-        = partial_sum.dist_ex(Coord(m, n));
+        = partial_sum.dist_to(Coord(m, n));
     }
   }
 }

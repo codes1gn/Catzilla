@@ -295,8 +295,8 @@ inline __device__ void identity(Matrix<float> inp, Matrix<float> out)
   int CHUNKS = CEIL_DIV(ELEMENTS, THREADS);
   int ROWPERCK = CEIL_DIV(THREADS, N);
   for (int ck = 0; ck < CHUNKS; ck++)
-    out.tile_ex(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread()
-      = inp.tile_ex(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread();
+    out.tile(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread()
+      = inp.tile(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread();
   __syncthreads();
   return;
 }
@@ -309,8 +309,8 @@ inline __device__ void identity(Matrix<half> inp, Matrix<float> out)
   int CHUNKS = CEIL_DIV(ELEMENTS, THREADS);
   int ROWPERCK = CEIL_DIV(THREADS, N);
   for (int ck = 0; ck < CHUNKS; ck++)
-    out.tile_ex(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread()
-      = inp.tile_ex(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread();
+    out.tile(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread()
+      = inp.tile(Coord(ck, 0), Coord(ROWPERCK, N)).dist_to_thread();
   __syncthreads();
   return;
 }

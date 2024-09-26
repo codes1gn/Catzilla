@@ -1,14 +1,19 @@
 ======================= DONE ==============================
 
-0. different shape of f16 mma kernel : done
-1. tf32 kernel pass : lhs ldmatrix passed, mma passed, rhs ldmatrix still has bug
+*. different shape of f16 mma kernel : done
+*. tf32 kernel pass : lhs ldmatrix passed, mma passed, rhs ldmatrix still has bug
+*. repack into Matrix : dist_to_fragments, and can be wrapped within kernel, make kernel interface as Matrix (c with float*, will be opt'd latter)
+*. refactor API
+*. add C-CACHE, set it to choreo
 
 ======================= TODO ==============================
 
-4. make one faster kernel, not limit to. (need to pack fragment loading in Matrix design)
-*. repack into Matrix : dist_to_fragments, and can be wrapped within kernel, make kernel interface as Matrix (c with float*, will be opt'd latter)
-5. add cp.async
-6. integrate to choreo // next week
+*. matmul_tensor_cores.h, line 69, fix bug
+*. make one faster kernel, not limit to. (need to pack fragment loading in Matrix design)
+*. add cp.async
+*. integrate to choreo // next week
+*. add f4copy to <=
+*. add border check to <=, allow more, allow less, allow tail, use ldmatrix-like design
 
-2. add TODO to baseline accrucy : pending, leave to latter dev
-3. handle C reuse issue : we fine, we can work now, and not become bottleneck yet.
+*. add TODO to baseline accrucy : pending, leave to latter dev
+*. handle C reuse issue : we fine, we can work now, and not become bottleneck yet.

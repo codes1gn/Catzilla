@@ -59,6 +59,10 @@ build: query-gpu-arch
 	@mkdir -p $(BUILD_DIR)
 	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Release .. \
 		-DCUDA_COMPUTE_CAPABILITY=$(CUDA_COMPUTE_CAPABILITY) \
+		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_C_COMPILER=clang \
+		-DCMAKE_CXX_COMPILER=clang++ \
 		-DCMAKE_CUDA_COMPILER=nvcc \
 		-DCMAKE_CUDA_FLAGS="-O3 -maxrregcount=128 --ptxas-options=-v --expt-relaxed-constexpr" \
 		-GNinja
@@ -68,6 +72,10 @@ debug: query-gpu-arch
 	@mkdir -p $(BUILD_DIR)
 	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=RelWithDebInfo .. \
 		-DCUDA_COMPUTE_CAPABILITY=$(CUDA_COMPUTE_CAPABILITY) \
+		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_C_COMPILER=clang \
+		-DCMAKE_CXX_COMPILER=clang++ \
 		-DCMAKE_CUDA_COMPILER=nvcc \
 		-DCMAKE_CUDA_FLAGS="-maxrregcount=128 --ptxas-options=-v --expt-relaxed-constexpr" \
 		-GNinja

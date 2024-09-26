@@ -58,30 +58,30 @@ __global__ void _matmul_pad_swizzled(int M, int N, int K, float alpha,
     for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
 #pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, X_THREAD); kin++) {
-        lhs_shared_mat.tile_ex(Coord(m, kin), per_block_data_shape)
-          .dist_ex(Coord(threadIdx.y, threadIdx.x))
-          // .dist_ex(Coord(threadId / K_TILE, threadId % K_TILE))
-          = lhs_mat.tile_ex(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-              .tile_ex(Coord(m, kin), per_block_data_shape)
-              // .dist_ex(Coord(threadId / K_TILE, threadId % K_TILE));
-              .dist_ex(Coord(threadIdx.y, threadIdx.x));
+        lhs_shared_mat.tile(Coord(m, kin), per_block_data_shape)
+          .dist_to(Coord(threadIdx.y, threadIdx.x))
+          // .dist_to(Coord(threadId / K_TILE, threadId % K_TILE))
+          = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+              .tile(Coord(m, kin), per_block_data_shape)
+              // .dist_to(Coord(threadId / K_TILE, threadId % K_TILE));
+              .dist_to(Coord(threadIdx.y, threadIdx.x));
         // lhs_shared[m * Y_THREAD * (K_TILE+1) + kin * X_THREAD + threadIdx.y *
         // (K_TILE+1) + threadIdx.x]
         //   = lhs_mat
-        //   .tile_ex(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-        //   .tile_ex(Coord(m, kin), per_block_data_shape)
-        //   // .dist_ex(Coord(threadId / K_TILE, threadId % K_TILE));
-        //   .dist_ex(Coord(threadIdx.y, threadIdx.x)).data[0];
+        //   .tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+        //   .tile(Coord(m, kin), per_block_data_shape)
+        //   // .dist_to(Coord(threadId / K_TILE, threadId % K_TILE));
+        //   .dist_to(Coord(threadIdx.y, threadIdx.x)).data[0];
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, Y_THREAD); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-        rhs_shared_mat.tile_ex(Coord(kin, n), per_block_data_shape)
-          .dist_ex(Coord(threadIdx.y, threadIdx.x))
-          = rhs_mat.tile_ex(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
-              .tile_ex(Coord(kin, n), per_block_data_shape)
-              .dist_ex(Coord(threadIdx.y, threadIdx.x));
+        rhs_shared_mat.tile(Coord(kin, n), per_block_data_shape)
+          .dist_to(Coord(threadIdx.y, threadIdx.x))
+          = rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
+              .tile(Coord(kin, n), per_block_data_shape)
+              .dist_to(Coord(threadIdx.y, threadIdx.x));
       }
     }
     __syncthreads();
@@ -95,10 +95,10 @@ __global__ void _matmul_pad_swizzled(int M, int N, int K, float alpha,
   for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
 #pragma unroll
     for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-      out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-        .tile_ex(Coord(m, n), per_block_data_shape)
-        .dist_ex(Coord(threadIdx.y, threadIdx.x))
-        = partial_sum.dist_ex(Coord(m, n));
+      out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+        .tile(Coord(m, n), per_block_data_shape)
+        .dist_to(Coord(threadIdx.y, threadIdx.x))
+        = partial_sum.dist_to(Coord(m, n));
     }
   }
 }

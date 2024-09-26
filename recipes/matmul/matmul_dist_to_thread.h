@@ -60,20 +60,18 @@ __global__ void _matmul_dist_to_thread(int M, int N, int K, float alpha,
       for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
         // TODO: span_as(y * 4, x / 4)
         int x = threadIdx.y * X_THREAD + threadIdx.x;
-        lhs_shared_mat.tile_ex(Coord(m, kin), lhs_reg_tile_shape)
-          .dist_to_thread()
-          = lhs_mat.tile_ex(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-              .tile_ex(Coord(m, kin), lhs_reg_tile_shape)
+        lhs_shared_mat.tile(Coord(m, kin), lhs_reg_tile_shape).dist_to_thread()
+          = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+              .tile(Coord(m, kin), lhs_reg_tile_shape)
               .dist_to_thread();
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-        rhs_shared_mat.tile_ex(Coord(kin, n), rhs_reg_tile_shape)
-          .dist_to_thread()
-          = rhs_mat.tile_ex(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
-              .tile_ex(Coord(kin, n), rhs_reg_tile_shape)
+        rhs_shared_mat.tile(Coord(kin, n), rhs_reg_tile_shape).dist_to_thread()
+          = rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
+              .tile(Coord(kin, n), rhs_reg_tile_shape)
               .dist_to_thread();
       }
     }
@@ -84,20 +82,20 @@ __global__ void _matmul_dist_to_thread(int M, int N, int K, float alpha,
       lhs_shared_mat.data, rhs_shared_mat.data, partial_sum.data);
     // identity<16, 16>(
     //   rhs_shared_mat,
-    //   out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape));
+    //   out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape));
   }
   __syncthreads();
 
   for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
 #pragma unroll
     for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-      // out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-      //   .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
+      // out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+      //   .tile(Coord(m, n), Coord(Y_THREAD, X_THREAD))
       //   <= partial_sum;
-      out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-        .tile_ex(Coord(m, n), Coord(Y_THREAD, X_THREAD))
+      out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+        .tile(Coord(m, n), Coord(Y_THREAD, X_THREAD))
         .dist_to_thread()
-        = partial_sum.dist_ex(Coord(m, n));
+        = partial_sum.dist_to(Coord(m, n));
     }
   }
 }

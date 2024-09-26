@@ -66,26 +66,30 @@ _matmul_tensor_cores_wmma_m16n16k16_f16f32(int M, int N, int K, float alpha,
   //   = make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD)>();
 
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
+    // TODO: fix bug, why <= slower than dist_to_thread
     for (int m = 0; m < CEIL_DIV(M_TILE, 2); m++) {
-#pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, 16); kin++) {
-        lhs_shared_mat.tile_ex(Coord(m, kin), Coord(2, 16)).dist_to_thread()
-          = lhs_mat.tile_ex(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-              .tile_ex(Coord(m, kin), Coord(2, 16))
+        lhs_shared_mat.tile(Coord(m, kin), Coord(2, 16)).dist_to_thread()
+          = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+              .tile(Coord(m, kin), Coord(2, 16))
               .dist_to_thread();
       }
     }
-    //     for (int kin = 0; kin < CEIL_DIV(K_TILE, 2); kin++) {
-    // #pragma unroll
-    //       for (int n = 0; n < CEIL_DIV(N_TILE, 16); n++) {
-    //         rhs_shared_mat.tile_ex(Coord(kin, n), Coord(2,
-    //         16)).dist_to_thread()
-    //           = rhs_mat.tile_ex(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
-    //               .tile_ex(Coord(kin, n), Coord(2, 16))
-    //               .dist_to_thread();
-    //       }
-    //     }
-    rhs_shared_mat <= rhs_mat.tile_ex(Coord(ko, blockIdx.x), rhs_sm_tile_shape);
+    // for (int kin = 0; kin < CEIL_DIV(K_TILE, 16); kin++) {
+    //   lhs_shared_mat.tile(Coord(0, kin), Coord(M_TILE, 16))
+    //     <= lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+    //         .tile(Coord(0, kin), Coord(M_TILE, 16));
+    // }
+    for (int kin = 0; kin < CEIL_DIV(K_TILE, 2); kin++) {
+#pragma unroll
+      for (int n = 0; n < CEIL_DIV(N_TILE, 16); n++) {
+        rhs_shared_mat.tile(Coord(kin, n), Coord(2, 16)).dist_to_thread()
+          = rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
+              .tile(Coord(kin, n), Coord(2, 16))
+              .dist_to_thread();
+      }
+    }
+    // rhs_shared_mat <= rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape);
     __syncthreads();
 
     // contract at 128x128x32 micro-kernel
@@ -98,9 +102,9 @@ _matmul_tensor_cores_wmma_m16n16k16_f16f32(int M, int N, int K, float alpha,
 
   for (int m = 0; m < CEIL_DIV(M_TILE, 2); m++) {
 #pragma unroll
-    out_mat.tile_ex(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-        .tile_ex(Coord(m, 0), Coord(2, 16))
-      <= out_shared_mat.tile_ex(Coord(m, 0), Coord(2, 16));
+    out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+        .tile(Coord(m, 0), Coord(2, 16))
+      <= out_shared_mat.tile(Coord(m, 0), Coord(2, 16));
   }
 }
 
@@ -185,19 +189,17 @@ __global__ void _matmul_tensor_cores_mma_m16n8k8_f16f32(int M, int N, int K,
     for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, K_TILE)); m++) {
 #pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, K_TILE); kin++) {
-        lhs_shared_mat.tile_ex(Coord(m, kin),
-                               Coord(CEIL_DIV(32, K_TILE), K_TILE))
-          <= lhs_mat.tile_ex(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-               .tile_ex(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE));
+        lhs_shared_mat.tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
+          <= lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+               .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE));
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, CEIL_DIV(32, N_TILE)); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, N_TILE); n++) {
-        rhs_shared_mat.tile_ex(Coord(kin, n),
-                               Coord(CEIL_DIV(32, N_TILE), N_TILE))
-          <= rhs_mat.tile_ex(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-               .tile_ex(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE));
+        rhs_shared_mat.tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+          <= rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+               .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE));
       }
     }
     __syncthreads();
@@ -209,19 +211,18 @@ __global__ void _matmul_tensor_cores_mma_m16n8k8_f16f32(int M, int N, int K,
                            out_shared_mat);
     // mma_m16n8k8_f16f32(out_shared_mat.data, lhs_shared_mat.data,
     //                    rhs_shared_mat.data, out_shared_mat.data);
-    // identity<16, 8>(lhs_shared_mat, out_shared_mat.tile_ex(Coord(0, ko),
+    // identity<16, 8>(lhs_shared_mat, out_shared_mat.tile(Coord(0, ko),
     // Coord(16, 8))); identity<8, 16>(rhs_shared_mat,
-    // out_shared_mat.tile_ex(Coord(ko, 0), Coord(8, 16)));
+    // out_shared_mat.tile(Coord(ko, 0), Coord(8, 16)));
   }
   __syncthreads();
 
   for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, N_TILE)); m++) {
-    out_mat.tile_ex(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-        .tile_ex(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-      <= out_shared_mat.tile_ex(Coord(m, 0),
-                                Coord(CEIL_DIV(32, N_TILE), N_TILE));
+    out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
+        .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+      <= out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE));
   }
-  // out_mat.tile_ex(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape) <=
+  // out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape) <=
   // out_shared_mat;
 }
 
@@ -306,22 +307,20 @@ __global__ void _matmul_tensor_cores_mma_m16n8k16_f16f32(int M, int N, int K,
     for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, K_TILE)); m++) {
 #pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, K_TILE); kin++) {
-        lhs_shared_mat
-          .tile_ex(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
+        lhs_shared_mat.tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
           .dist_to_thread()
-          = lhs_mat.tile_ex(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-              .tile_ex(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
+          = lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+              .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
               .dist_to_thread();
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, CEIL_DIV(32, N_TILE)); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, N_TILE); n++) {
-        rhs_shared_mat
-          .tile_ex(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+        rhs_shared_mat.tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
           .dist_to_thread()
-          = rhs_mat.tile_ex(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-              .tile_ex(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+          = rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+              .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
               .dist_to_thread();
       }
     }
@@ -332,18 +331,18 @@ __global__ void _matmul_tensor_cores_mma_m16n8k16_f16f32(int M, int N, int K,
     //                      rhs_shared_mat.data, out_shared_mat.data);
     mma_m16n8k16_f16f32(out_shared_mat.data, lhs_shared_mat.data,
                         rhs_shared_mat.data, out_shared_mat.data);
-    // identity<16, 8>(lhs_shared_mat, out_shared_mat.tile_ex(Coord(0, ko),
+    // identity<16, 8>(lhs_shared_mat, out_shared_mat.tile(Coord(0, ko),
     // Coord(16, 8))); identity<8, 16>(rhs_shared_mat,
-    // out_shared_mat.tile_ex(Coord(ko, 0), Coord(8, 16)));
+    // out_shared_mat.tile(Coord(ko, 0), Coord(8, 16)));
   }
   __syncthreads();
 
   for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, N_TILE)); m++) {
 #pragma unroll
-    out_mat.tile_ex(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-      .tile_ex(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+    out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
+      .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
       .dist_to_thread()
-      = out_shared_mat.tile_ex(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+      = out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
           .dist_to_thread();
   }
 }
@@ -429,22 +428,20 @@ __global__ void _matmul_tensor_cores_mma_m16n8k8_tf32f32(int M, int N, int K,
     for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, K_TILE)); m++) {
 #pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, K_TILE); kin++) {
-        lhs_shared_mat
-          .tile_ex(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
+        lhs_shared_mat.tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
           .dist_to_thread()
-          = lhs_mat.tile_ex(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-              .tile_ex(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
+          = lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+              .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
               .dist_to_thread();
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, CEIL_DIV(32, N_TILE)); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, N_TILE); n++) {
-        rhs_shared_mat
-          .tile_ex(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+        rhs_shared_mat.tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
           .dist_to_thread()
-          = rhs_mat.tile_ex(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-              .tile_ex(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+          = rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+              .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
               .dist_to_thread();
       }
     }
@@ -455,17 +452,17 @@ __global__ void _matmul_tensor_cores_mma_m16n8k8_tf32f32(int M, int N, int K,
     //                      rhs_shared_mat.data, out_shared_mat.data);
     mma_m16n8k8_tf32f32(out_shared_mat.data, lhs_shared_mat.data,
                         rhs_shared_mat.data, out_shared_mat.data);
-    // identity<16, 8>(lhs_shared_mat, out_shared_mat.tile_ex(Coord(0, ko),
+    // identity<16, 8>(lhs_shared_mat, out_shared_mat.tile(Coord(0, ko),
     // Coord(16, 8))); identity<8, 16>(rhs_shared_mat,
-    // out_shared_mat.tile_ex(Coord(ko, 0), Coord(8, 16)));
+    // out_shared_mat.tile(Coord(ko, 0), Coord(8, 16)));
   }
   __syncthreads();
 
   for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, N_TILE)); m++) {
-    out_mat.tile_ex(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-      .tile_ex(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+    out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
+      .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
       .dist_to_thread()
-      = out_shared_mat.tile_ex(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+      = out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
           .dist_to_thread();
   }
 }
@@ -551,22 +548,20 @@ __global__ void _matmul_tensor_cores_mma_m16n8k4_tf32f32(int M, int N, int K,
     for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, K_TILE)); m++) {
 #pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, K_TILE); kin++) {
-        lhs_shared_mat
-          .tile_ex(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
+        lhs_shared_mat.tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
           .dist_to_thread()
-          = lhs_mat.tile_ex(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-              .tile_ex(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
+          = lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+              .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
               .dist_to_thread();
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, CEIL_DIV(32, N_TILE)); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, N_TILE); n++) {
-        rhs_shared_mat
-          .tile_ex(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+        rhs_shared_mat.tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
           .dist_to_thread()
-          = rhs_mat.tile_ex(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-              .tile_ex(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+          = rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+              .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
               .dist_to_thread();
       }
     }
@@ -577,18 +572,18 @@ __global__ void _matmul_tensor_cores_mma_m16n8k4_tf32f32(int M, int N, int K,
     //                      rhs_shared_mat.data, out_shared_mat.data);
     mma_m16n8k4_tf32f32(out_shared_mat.data, lhs_shared_mat.data,
                         rhs_shared_mat.data, out_shared_mat.data);
-    // identity<16, 8>(lhs_shared_mat, out_shared_mat.tile_ex(Coord(0, ko),
+    // identity<16, 8>(lhs_shared_mat, out_shared_mat.tile(Coord(0, ko),
     // Coord(16, 8))); identity<8, 16>(rhs_shared_mat,
-    // out_shared_mat.tile_ex(Coord(ko, 0), Coord(8, 16)));
+    // out_shared_mat.tile(Coord(ko, 0), Coord(8, 16)));
   }
   __syncthreads();
 
   for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, N_TILE)); m++) {
 #pragma unroll
-    out_mat.tile_ex(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-      .tile_ex(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+    out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
+      .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
       .dist_to_thread()
-      = out_shared_mat.tile_ex(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+      = out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
           .dist_to_thread();
   }
 }
@@ -655,62 +650,27 @@ _matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(int M, int N, int K, float alpha,
 
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
     for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
-#pragma unroll
-      // if (threadIdx.y == 0)
-      //   for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
-      //     lhs_shared_mat.tile_ex(Coord(m, kin), lhs_reg_tile_shape)
-      //       <<= lhs_mat.tile_ex(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-      //            .tile_ex(Coord(m, kin), lhs_reg_tile_shape);
-      //   }
-      lhs_shared_mat.tile_ex(Coord(threadIdx.y, kin), lhs_reg_tile_shape)
-        <<= lhs_mat.tile_ex(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-              .tile_ex(Coord(threadIdx.y, kin), lhs_reg_tile_shape);
-#pragma unroll
-      // if (threadIdx.y == 0)
-      //   for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-      //     rhs_shared_mat.tile_ex(Coord(kin, n), rhs_reg_tile_shape)
-      //       <<= rhs_mat.tile_ex(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-      //            .tile_ex(Coord(kin, n), rhs_reg_tile_shape);
-      //   }
-      rhs_shared_mat.tile_ex(Coord(kin, threadIdx.y), rhs_reg_tile_shape)
-        <<= rhs_mat.tile_ex(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-              .tile_ex(Coord(kin, threadIdx.y), rhs_reg_tile_shape);
+      lhs_shared_mat.tile(Coord(0, kin), Coord(M_TILE, K_REG))
+        <= lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+             .tile(Coord(0, kin), Coord(M_TILE, K_REG));
+      rhs_shared_mat.tile(Coord(kin, 0), Coord(K_REG, N_TILE))
+        <= rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+             .tile(Coord(kin, 0), Coord(K_REG, N_TILE));
       __syncthreads();
 
-      // if (threadIdx.y == 0)
-      //   for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
-      //     for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-      //       mma_m16n8k8_f16f32_neo(
-      //         out_shared_mat.tile_ex(Coord(m, n), Coord(M_REG, N_REG)),
-      //         lhs_shared_mat.tile_ex(Coord(m, kin), Coord(M_REG, K_REG)),
-      //         rhs_shared_mat.tile_ex(Coord(kin, n), Coord(K_REG, N_REG)),
-      //         out_shared_mat.tile_ex(Coord(m, n), Coord(M_REG, N_REG)));
-      //     }
-      //   }
       for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
         mma_m16n8k8_f16f32_neo(
-          out_shared_mat.tile_ex(Coord(threadIdx.y, n), Coord(M_REG, N_REG)),
-          lhs_shared_mat.tile_ex(Coord(threadIdx.y, kin), Coord(M_REG, K_REG)),
-          rhs_shared_mat.tile_ex(Coord(kin, n), Coord(K_REG, N_REG)),
-          out_shared_mat.tile_ex(Coord(threadIdx.y, n), Coord(M_REG, N_REG)));
+          out_shared_mat.tile(Coord(threadIdx.y, n), Coord(M_REG, N_REG)),
+          lhs_shared_mat.tile(Coord(threadIdx.y, kin), Coord(M_REG, K_REG)),
+          rhs_shared_mat.tile(Coord(kin, n), Coord(K_REG, N_REG)),
+          out_shared_mat.tile(Coord(threadIdx.y, n), Coord(M_REG, N_REG)));
       }
     }
   }
   __syncthreads();
 
-  // if (threadIdx.y == 0)
-  //   for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
-  //     for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-  //       out_mat.tile_ex(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-  //           .tile_ex(Coord(m, n), out_reg_tile_shape)
-  //         <<= out_shared_mat.tile_ex(Coord(m, n), out_reg_tile_shape);
-  //     }
-  //   }
-  for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-    out_mat.tile_ex(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-      .tile_ex(Coord(threadIdx.y, n), out_reg_tile_shape)
-      <<= out_shared_mat.tile_ex(Coord(threadIdx.y, n), out_reg_tile_shape);
-  }
+  out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
+    <= out_shared_mat;
 }
 
 void matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(int M, int N, int K,
@@ -718,14 +678,14 @@ void matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(int M, int N, int K,
                                                   float *B, float beta,
                                                   float *C)
 {
-  const int M_TILE = 64;
-  const int N_TILE = 32;
-  const int K_TILE = 64; // slice K_TILE TO K_REG with Y_thread
+  const int M_TILE = 128;
+  const int N_TILE = 64;
+  const int K_TILE = 32; // slice K_TILE TO K_REG with Y_thread
   const int M_REG = 16;
   const int N_REG = 8;
   const int K_REG = 8;
   const int WRAP_SIZE = 32;
-  const int WRAP_AMOUNT = 4;
+  const int WRAP_AMOUNT = 8;
   assert(M_REG * K_REG > X_THREAD * Y_THREAD);
   assert(N_REG * K_REG > X_THREAD * Y_THREAD);
 
