@@ -308,9 +308,13 @@ template <typename T> struct Matrix {
   // operator
   inline __device__ void operator<=(const Matrix &other)
   {
-    int total_threads = blockDim.x * blockDim.y;
-    int total_elements = shape.first * shape.second;
+    // can make 11352
+    // int total_threads = blockDim.x * blockDim.y;
+    int total_threads = 256;
+    // int total_elements = shape.first * shape.second;
+    int total_elements = 128 * 32;
     int thread_id = threadIdx.y * blockDim.x + threadIdx.x;
+
     int row_this = thread_id / shape.second;
     int col_this = thread_id % shape.second;
     int row_other = thread_id / other.shape.second;
@@ -318,7 +322,14 @@ template <typename T> struct Matrix {
 
     // TODO: make this config more general
     // #pragma unroll 8
+    // NOTE: we need constexpr for avoiding heavy runtime index calc
     // compile-time symbolic index calc, become perf drop
+    // for (int i = 0; i < total_elements / total_threads; i++)
+    //   (data)[i * total_threads * 32 / 32
+    //          + row_this * 32 + col_this]
+    //     = ((other.data))[i * total_threads *4096
+    //                        /32
+    //                      + row_other * 4096 + col_other];
 #pragma unroll
     for (int i = 0; i < total_elements / total_threads; i++)
       (data)[i * total_threads * stride.first / shape.second
