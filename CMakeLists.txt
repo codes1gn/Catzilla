@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.19)
 project(CATZILLA LANGUAGES CXX CUDA)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# config catch2 for testing
+# include(FetchContent)
+#
+# FetchContent_Declare(
+#     Catch2
+#     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+#     GIT_TAG        v3.3.0
+# )
+# FetchContent_MakeAvailable(Catch2)
+
 find_package(CUDA REQUIRED)
 
 # ensure cuda is available

@@ -65,26 +65,26 @@ struct Coord {
   int second;
 
   // 构造函数
-  __device__ Coord(int first, int second)
+  constexpr __device__ Coord(int first, int second)
       : first(first)
       , second(second)
   {
   }
 
   // 从 std::tuple<int, int> 构造
-  __device__ Coord(const std::tuple<int, int> &t)
+  constexpr __device__ Coord(const std::tuple<int, int> &t)
       : first(std::get<0>(t))
       , second(std::get<1>(t))
   {
   }
 
   // 将 Coord 转换为 std::tuple<int, int>
-  __device__ std::tuple<int, int> to_tuple() const
+  constexpr __device__ std::tuple<int, int> to_tuple() const
   {
     return std::make_tuple(first, second);
   }
 
-  __device__ Coord &xor_swizzle()
+  constexpr __device__ Coord &xor_swizzle()
   {
     auto i16 = (first * 32 + second) * sizeof(float) / 16;
     auto y16 = i16 / 8;
@@ -97,7 +97,7 @@ struct Coord {
     return *this;
   }
 
-  __device__ Coord &xor_swizzle_col()
+  constexpr __device__ Coord &xor_swizzle_col()
   {
     auto i = (first * 16 + second);
     auto i_swz = (first * 16 + second) ^ first;
@@ -106,7 +106,7 @@ struct Coord {
     return *this;
   }
 
-  __device__ Coord &xor_swizzle_row()
+  constexpr __device__ Coord &xor_swizzle_row()
   {
     auto i = (first * 16 + second);
     auto i_swz = (first * 16 + second) ^ second;
@@ -125,28 +125,28 @@ template <typename T> struct Matrix {
   Coord shape;
   Coord stride;
 
-  __device__ Matrix(T *data, Coord shape)
+  constexpr __device__ Matrix(T *data, Coord shape)
       : data(data)
       , shape(shape)
       , stride(Coord(shape.second, 1))
   {
   }
 
-  __device__ Matrix(T *data, Coord shape, Coord stride)
+  constexpr __device__ Matrix(T *data, Coord shape, Coord stride)
       : data(data)
       , shape(shape)
       , stride(stride)
   {
   }
 
-  __device__ Matrix(const Matrix &other)
+  constexpr __device__ Matrix(const Matrix &other)
       : data(other.data)
       , shape(other.shape)
       , stride(other.stride)
   {
   }
 
-  __device__ Matrix(Matrix &&other) noexcept
+  constexpr __device__ Matrix(Matrix &&other) noexcept
       : data(other.data)
       , shape(other.shape)
       , stride(other.stride)
@@ -160,7 +160,7 @@ template <typename T> struct Matrix {
     return *this;
   }
 
-  inline __device__ void fill(T value)
+  constexpr inline __device__ void fill(T value)
   {
     int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
     int row_in_current = flat_id / shape.second;
@@ -209,7 +209,7 @@ template <typename T> struct Matrix {
   }
 
   template <typename U = T>
-  inline __device__
+  constexpr inline __device__
     typename std::enable_if<std::is_same<U, float>::value, void>::type
     load_fragments_c(float *loader)
   {
@@ -225,7 +225,7 @@ template <typename T> struct Matrix {
   }
 
   template <typename U = T>
-  inline __device__
+  constexpr inline __device__
     typename std::enable_if<std::is_same<U, float>::value, void>::type
     store_fragments_c(float *storer)
   {
@@ -241,7 +241,7 @@ template <typename T> struct Matrix {
     }
   }
 
-  inline __device__ Matrix tile(Coord tile_var, Coord other_shape)
+  constexpr inline __device__ Matrix tile(Coord tile_var, Coord other_shape)
   {
     Matrix ret
       = Matrix(data + tile_var.first * other_shape.first * stride.first
@@ -250,7 +250,7 @@ template <typename T> struct Matrix {
     return std::move(ret);
   }
 
-  inline __device__ Matrix dist_to(Coord tile_var)
+  constexpr inline __device__ Matrix dist_to(Coord tile_var)
   {
     // shape = 8 x 2
     // y in 0-4, x in 0-4
@@ -260,7 +260,7 @@ template <typename T> struct Matrix {
     return std::move(ret);
   }
 
-  inline __device__ Matrix dist_to(int dist_id)
+  constexpr inline __device__ Matrix dist_to(int dist_id)
   {
     int row_in_current = dist_id / shape.second;
     int col_in_current = dist_id % shape.second;
@@ -271,7 +271,7 @@ template <typename T> struct Matrix {
   }
 
   // distribute the following 32 elements to a wrap
-  inline __device__ Matrix dist_to_wrap()
+  constexpr inline __device__ Matrix dist_to_wrap()
   {
     // NOTE: we can have three design
     // 1. use all threads to spread
@@ -288,7 +288,7 @@ template <typename T> struct Matrix {
   }
 
   // distribute the following NUM_THREADS elements to all threads
-  inline __device__ Matrix dist_to_thread()
+  constexpr inline __device__ Matrix dist_to_thread()
   {
     // NOTE: we can have three design
     // 1. use all threads to spread
@@ -306,13 +306,13 @@ template <typename T> struct Matrix {
 
   // operator '<=' is syntax sugar that combines dist-to-threads and '='
   // operator
-  inline __device__ void operator<=(const Matrix &other)
+  constexpr inline __device__ void operator<=(const Matrix &other)
   {
     // can make 11352
-    // int total_threads = blockDim.x * blockDim.y;
-    int total_threads = 256;
-    // int total_elements = shape.first * shape.second;
-    int total_elements = 128 * 32;
+    int total_threads = blockDim.x * blockDim.y;
+    // int total_threads = 256;
+    int total_elements = shape.first * shape.second;
+    // int total_elements = 128 * 32;
     int thread_id = threadIdx.y * blockDim.x + threadIdx.x;
 
     int row_this = thread_id / shape.second;
@@ -331,7 +331,7 @@ template <typename T> struct Matrix {
     //                        /32
     //                      + row_other * 4096 + col_other];
 #pragma unroll
-    for (int i = 0; i < total_elements / total_threads; i++)
+    for (int i = 0; i < 16/* total_elements / total_threads */; i++)
       (data)[i * total_threads * stride.first / shape.second
              + row_this * stride.first + col_this]
         = ((other.data))[i * total_threads * other.stride.first
@@ -369,7 +369,7 @@ template <typename T> struct Matrix {
   //           .dist_to_thread();
   //   }
   template <typename U = T>
-  inline __device__
+  constexpr inline __device__
     typename std::enable_if<std::is_same<U, half>::value, void>::type
     operator<=(const Matrix<float> &other)
   {
@@ -443,7 +443,7 @@ template <typename T> struct Matrix {
   // }
   // special operator that allows any same-volume copy, when the volume is
   // dividable by threads volume
-  inline __device__ void operator<<=(const Matrix &other)
+  constexpr inline __device__ void operator<<=(const Matrix &other)
   {
     int total_threads = blockDim.x;
     // int total_threads = blockDim.x * blockDim.y;
@@ -461,8 +461,9 @@ template <typename T> struct Matrix {
                      + row_other * other.stride.first + col_other];
     }
   }
+
   template <typename U = T>
-  inline __device__
+  constexpr inline __device__
     typename std::enable_if<std::is_same<U, half>::value, void>::type
     operator<<=(const Matrix<float> &other)
   {
@@ -483,12 +484,12 @@ template <typename T> struct Matrix {
     }
   }
 
-  __device__ void operator=(const Matrix<T> &other)
+  constexpr __device__ void operator=(const Matrix<T> &other)
   {
     *data = *other.data;
   }
 
-  __device__ void operator=(const T other_scalar)
+  constexpr __device__ void operator=(const T other_scalar)
   {
     *data = other_scalar;
   }
@@ -496,7 +497,7 @@ template <typename T> struct Matrix {
   // TODO: merge generics
   // half <= float
   template <typename U = T>
-  __device__ typename std::enable_if<std::is_same<U, half>::value, void>::type
+  constexpr inline __device__ typename std::enable_if<std::is_same<U, half>::value, void>::type
   operator=(const Matrix<float> &other)
   {
     *data = __float2half(*other.data);
@@ -504,21 +505,21 @@ template <typename T> struct Matrix {
 
   // float <= half
   template <typename U = T>
-  __device__ typename std::enable_if<std::is_same<U, float>::value, void>::type
+  constexpr inline __device__ typename std::enable_if<std::is_same<U, float>::value, void>::type
   operator=(const Matrix<half> &other)
   {
     *data = __half2float(*other.data);
   }
 
   template <typename U = T>
-  __device__ typename std::enable_if<std::is_same<U, half>::value, void>::type
+  constexpr inline __device__ typename std::enable_if<std::is_same<U, half>::value, void>::type
   operator=(const float other_scalar)
   {
     *data = __float2half(other_scalar);
   }
 
   template <typename U = T>
-  __device__ typename std::enable_if<std::is_same<U, float>::value, void>::type
+  constexpr inline __device__ typename std::enable_if<std::is_same<U, float>::value, void>::type
   print() const
   {
     for (size_t i = 0; i < shape.first; ++i) {

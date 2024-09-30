@@ -10,7 +10,8 @@
 
 ======================= TODO ==============================
 
-*. use compile-time value for Matrix design, like nalgebra
+*. config CATCH2 and add test for constexpr design
+*. use compile-time value for Matrix design, like nalgebra | if problem comes from threadIdx.y these runtime value, try to add const value into API for (loop-extents)
 *. pack wmma into Matrix design
 *. make one faster kernel, not limit to. (need to pack fragment loading in Matrix design)
 *. integrate to choreo // next week
