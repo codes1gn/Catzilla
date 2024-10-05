@@ -147,16 +147,16 @@ __global__ void _matmul_tuned_with_mma_kernel(int M, int N, int K, float alpha,
   // const int X_THREAD = 16;
   // const int Y_THREAD = 16;
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
-    // for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
-    //   for (int kin = 0; kin < CEIL_DIV(K_TILE, X_THREAD); kin++) {
-    //     lhs_shared_mat.tile(Coord(m, kin), per_block_data_shape)
-    //       .dist_to(Coord(threadIdx.y, threadIdx.x))
-    //       = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-    //           .tile(Coord(m, kin), per_block_data_shape)
-    //           .dist_to(Coord(threadIdx.y, threadIdx.x));
-    //   }
-    // }
-    lhs_shared_mat <= lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape);
+    for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
+      for (int kin = 0; kin < CEIL_DIV(K_TILE, X_THREAD); kin++) {
+        lhs_shared_mat.tile(Coord(m, kin), per_block_data_shape)
+          .dist_to(Coord(threadIdx.y, threadIdx.x))
+          = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+              .tile(Coord(m, kin), per_block_data_shape)
+              .dist_to(Coord(threadIdx.y, threadIdx.x));
+      }
+    }
+    // lhs_shared_mat <= lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape);
 
     for (int kin = 0; kin < CEIL_DIV(K_TILE, Y_THREAD); kin++) {
       for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {

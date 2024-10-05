@@ -131,6 +131,9 @@ dev4: build
 dev5: build 
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 256 -size-n 256 -size-k 256
 
+test: build
+	@cd $(BUILD_DIR)/tests && ctest -V
+
 format:
 	@cd $(BUILD_DIR) && ninja format-code
 

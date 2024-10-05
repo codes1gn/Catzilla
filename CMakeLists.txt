@@ -3,14 +3,15 @@ project(CATZILLA LANGUAGES CXX CUDA)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # config catch2 for testing
-# include(FetchContent)
-#
-# FetchContent_Declare(
-#     Catch2
-#     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-#     GIT_TAG        v3.3.0
-# )
-# FetchContent_MakeAvailable(Catch2)
+include(FetchContent)
+
+FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG        v3.3.0
+)
+FetchContent_MakeAvailable(Catch2)
+include_directories(${catch2_SOURCE_DIR}/single_include)
 
 find_package(CUDA REQUIRED)
 
@@ -54,6 +55,7 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/references)
 add_subdirectory(${PROJECT_SOURCE_DIR}/catz)
 add_subdirectory(${PROJECT_SOURCE_DIR}/recipes)
 add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark)
+add_subdirectory(${PROJECT_SOURCE_DIR}/tests)
 
 # ==============================================================
 # ==   house-keeping code
@@ -95,3 +97,8 @@ add_custom_target(
     check-code-format
     DEPENDS clang_format_check_only
 )
+
+# add_custom_target(
+#     test
+#     DEPENDS tests
+# )
