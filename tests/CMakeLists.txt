@@ -1,18 +1,23 @@
 # 启用测试
 enable_testing()
 
-# 添加测试可执行文件
-add_executable(coord_test unittests/coord_test.cu)
-add_executable(smoke_test unittests/smoke_test.cpp)
+set(SOURCES "")
 
-# 链接 Catch2 库（如果需要）
-target_link_libraries(coord_test PRIVATE catz Catch2::Catch2WithMain ${CUDA_LIBRARIES})
-target_link_libraries(smoke_test PRIVATE catz Catch2::Catch2WithMain ${CUDA_LIBRARIES})
+file(GLOB_RECURSE CU_TEST_SOURCES "unittests/*_test.cu")
+list(APPEND SOURCES ${CU_TEST_SOURCES})
 
-list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
-include(CTest)
-include(Catch)
+file(GLOB_RECURSE CPP_TEST_SOURCES "unittests/*_test.cu")
+list(APPEND SOURCES ${CPP_TEST_SOURCES})
 
-# 自动发现测试用例
-catch_discover_tests(coord_test)
-catch_discover_tests(smoke_test)
+foreach(src ${SOURCES})
+  get_filename_component(binary ${src} NAME_WE)
+  add_executable(${binary} ${src})
+
+  target_link_libraries(${binary} PRIVATE catz Catch2::Catch2WithMain ${CUDA_LIBRARIES})
+
+  list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+  include(CTest)
+  include(Catch)
+
+  catch_discover_tests(${binary})
+endforeach()
