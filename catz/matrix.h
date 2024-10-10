@@ -135,15 +135,21 @@ struct Coord {
   }
 };
 
-template <int FIRST, int SECOND> struct CoordNightly {
-  static_assert(FIRST != 0, "first dim cannot be zero.");
-  static_assert(SECOND != 0, "second dim cannot be zero.");
-  static constexpr int first = FIRST;
-  static constexpr int second = SECOND;
+template <int ROWS, int COLS> struct CoordNightly {
+  static_assert(ROWS != 0, "first dim cannot be zero.");
+  static_assert(COLS != 0, "second dim cannot be zero.");
+  static constexpr int first = ROWS;
+  static constexpr int second = COLS;
 
   // 构造函数
   constexpr __device__ CoordNightly()
   {
+  }
+
+  constexpr __device__ CoordNightly(int rows, int cols)
+  {
+    first = rows;
+    second = cols;
   }
 
   template <int ofirst, int osecond>
@@ -208,6 +214,35 @@ template <int FIRST, int SECOND> struct CoordNightly {
     return CoordNightly<(i_swz / 16), (i_swz % 16)>();
   }
 };
+
+template <typename T, typename CoordType, typename CoordType2>
+struct MatrixNightly;
+
+template <typename T, int ROWS, int COLS, int STRD>
+struct MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<STRD, 1>> {
+  static_assert(is_allowed_type<T>::value,
+                "T must be one of the allowed types: float, half, or float4.");
+  T *data;
+  CoordNightly<ROWS, COLS> shape;
+  CoordNightly<STRD, 1> stride;
+
+  constexpr __device__ MatrixNightly(T *data, CoordNightly<ROWS, COLS> shape,
+                                     CoordNightly<STRD, 1> stride)
+      : data(data)
+      , shape(shape)
+      , stride(stride)
+  {
+  }
+};
+
+// auto matrix = make_matrix(data, Coord<16, 32>())
+// Matrix<float, Coord> matrix(data, Coord<16, 32>());
+template <typename T, typename CoordType, typename CoordType2>
+MatrixNightly<T, CoordType, CoordType2> make_matrix(T *data, CoordType shape,
+                                                    CoordType2 stride)
+{
+  return MatrixNightly<T, CoordType, CoordType2>(data, shape, stride);
+}
 
 template <typename T> struct Matrix {
   static_assert(is_allowed_type<T>::value,
