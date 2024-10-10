@@ -228,6 +228,54 @@ struct MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<STRD, 1>> {
       , stride(stride)
   {
   }
+
+  // copy
+  constexpr __device__ MatrixNightly(const MatrixNightly &other)
+      : data(other.data)
+      , shape(other.shape)
+      , stride(other.stride)
+  {
+  }
+
+  // move
+  constexpr __device__ MatrixNightly(MatrixNightly &&other) noexcept
+      : data(other.data)
+      , shape(other.shape)
+      , stride(other.stride)
+  {
+    other.data = nullptr;
+  }
+
+  inline __device__ MatrixNightly next()
+  {
+    data += 1;
+    return *this;
+  }
+
+  inline __device__ void fill(T value)
+  {
+    int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
+    int row_in_current = flat_id / shape.second;
+    int col_in_current = flat_id % shape.second;
+    int elements = shape.first * shape.second;
+    int threads = blockDim.x * blockDim.y;
+    for (int chunk = 0; chunk < CEIL_DIV(elements, threads); chunk++) {
+      data[chunk * threads + flat_id] = value;
+    }
+  }
+
+  // TODO: make it device'd code
+  template <int NROWS, int NCOLS>
+  constexpr inline MatrixNightly<T, CoordNightly<NROWS, NCOLS>,
+                                 CoordNightly<STRD, 1>>
+  tile(Coord tile_var, CoordNightly<NROWS, NCOLS> new_shape)
+  {
+    T *new_data = data + tile_var.first * new_shape.first * stride.first
+                  + tile_var.second * new_shape.second * stride.second;
+    MatrixNightly<T, CoordNightly<NROWS, NCOLS>, CoordNightly<STRD, 1>> ret
+      = make_matrix(new_data, new_shape, stride);
+    return std::move(ret);
+  }
 };
 
 // Default helper func:
@@ -273,6 +321,7 @@ template <typename T> struct Matrix {
   {
   }
 
+  // copy
   constexpr __device__ Matrix(const Matrix &other)
       : data(other.data)
       , shape(other.shape)
@@ -280,6 +329,7 @@ template <typename T> struct Matrix {
   {
   }
 
+  // move
   constexpr __device__ Matrix(Matrix &&other) noexcept
       : data(other.data)
       , shape(other.shape)

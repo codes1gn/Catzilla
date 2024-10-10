@@ -10,6 +10,7 @@
 
 ======================= TODO ==============================
 
+*. test static tile in catch2, as __device__ func
 *. config CATCH2 and add test for constexpr design
 *. use compile-time value for Matrix design, like nalgebra | if problem comes from threadIdx.y these runtime value, try to add const value into API for (loop-extents)
 *. pack wmma into Matrix design
