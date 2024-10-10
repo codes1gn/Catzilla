@@ -146,12 +146,6 @@ template <int ROWS, int COLS> struct CoordNightly {
   {
   }
 
-  constexpr __device__ CoordNightly(int rows, int cols)
-  {
-    first = rows;
-    second = cols;
-  }
-
   template <int ofirst, int osecond>
   constexpr CoordNightly<first + ofirst, second + osecond>
   operator+(const CoordNightly<ofirst, osecond> &other) const
@@ -226,6 +220,7 @@ struct MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<STRD, 1>> {
   CoordNightly<ROWS, COLS> shape;
   CoordNightly<STRD, 1> stride;
 
+  // the complete construction function
   constexpr __device__ MatrixNightly(T *data, CoordNightly<ROWS, COLS> shape,
                                      CoordNightly<STRD, 1> stride)
       : data(data)
@@ -235,13 +230,24 @@ struct MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<STRD, 1>> {
   }
 };
 
-// auto matrix = make_matrix(data, Coord<16, 32>())
-// Matrix<float, Coord> matrix(data, Coord<16, 32>());
+// Default helper func:
+// (T*, CoordType, CoordType) -> Matrix
+// auto matrix = make_matrix(data, Coord<16, 32>(), Coord<32, 1>())
 template <typename T, typename CoordType, typename CoordType2>
 MatrixNightly<T, CoordType, CoordType2> make_matrix(T *data, CoordType shape,
                                                     CoordType2 stride)
 {
   return MatrixNightly<T, CoordType, CoordType2>(data, shape, stride);
+}
+
+// Specialised helper for contiguous memory
+// (T*, CoordType) -> Matrix
+template <typename T, int ROWS, int COLS>
+MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<COLS, 1>>
+make_matrix(T *data, CoordNightly<ROWS, COLS> shape)
+{
+  return MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<COLS, 1>>(
+    data, shape, CoordNightly<COLS, 1>());
 }
 
 template <typename T> struct Matrix {

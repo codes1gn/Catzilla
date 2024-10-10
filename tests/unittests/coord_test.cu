@@ -76,3 +76,4 @@ TEST_CASE("coord div nightly", "[coord][div]") {
   static_assert(coord3.first == 4, "coord.first wrong");
   static_assert(coord3.second == 4, "coord.second wrong");
 }
+
