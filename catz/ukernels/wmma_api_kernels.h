@@ -8,7 +8,7 @@
 #include <cuda_runtime.h>
 #include <mma.h>
 
-#include "matrix_utils.h"
+#include "matrix.h"
 
 using namespace catz;
 

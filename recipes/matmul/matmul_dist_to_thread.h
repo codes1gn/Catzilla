@@ -7,9 +7,9 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#include "macros.h"
-#include "matrix_utils.h"
-#include "micro_kernels.h"
+#include "macro.h"
+#include "matrix.h"
+#include "ukernels.h"
 
 using namespace catz;
 using namespace catz::cuda;

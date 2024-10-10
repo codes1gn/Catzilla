@@ -1,5 +1,5 @@
-#ifndef CATZILLA_RECIPES_UTILS_MACROS_H_
-#define CATZILLA_RECIPES_UTILS_MACROS_H_
+#ifndef CATZILLA_CATZ_MACRO_H_
+#define CATZILLA_CATZ_MACRO_H_
 
 namespace catz
 {
@@ -16,4 +16,4 @@ namespace catz
 
 } // namespace catz
 
-#endif // CATZILLA_RECIPES_UTILS_MACROS_H_
+#endif // CATZILLA_CATZ_MACRO_H_

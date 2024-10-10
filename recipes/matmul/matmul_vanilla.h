@@ -6,10 +6,10 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#include "macros.h"
-#include "matrix_utils.h"
-#include "micro_kernels.h"
-#include "micro_kernels/cuda_kernels.h"
+#include "macro.h"
+#include "matrix.h"
+#include "ukernels.h"
+#include "ukernels/cuda_kernels.h"
 
 using namespace catz;
 using namespace catz::cuda;

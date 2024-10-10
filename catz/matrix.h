@@ -1,5 +1,5 @@
-#ifndef CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
-#define CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
+#ifndef CATZILLA_CATZ_MATRIX_H_
+#define CATZILLA_CATZ_MATRIX_H_
 
 #include <algorithm>
 #include <cassert>
@@ -14,7 +14,7 @@
 #include <type_traits>
 
 #include "cuda_utils.h"
-#include "macros.h"
+#include "macro.h"
 
 // TODO: rename to matrix.h
 namespace catz
@@ -132,6 +132,80 @@ struct Coord {
     second = i_swz % 16;
     first = i_swz / 16;
     return *this;
+  }
+};
+
+template <int FIRST, int SECOND> struct CoordNightly {
+  static_assert(FIRST != 0, "first dim cannot be zero.");
+  static_assert(SECOND != 0, "second dim cannot be zero.");
+  static constexpr int first = FIRST;
+  static constexpr int second = SECOND;
+
+  // 构造函数
+  constexpr __device__ CoordNightly()
+  {
+  }
+
+  template <int ofirst, int osecond>
+  constexpr CoordNightly<first + ofirst, second + osecond>
+  operator+(const CoordNightly<ofirst, osecond> &other) const
+  {
+    return CoordNightly<first + other.first, second + other.second>();
+  }
+
+  template <int ofirst, int osecond>
+  constexpr CoordNightly<first - ofirst, second - osecond>
+  operator-(const CoordNightly<ofirst, osecond> &other) const
+  {
+    return CoordNightly<first - other.first, second - other.second>();
+  }
+
+  template <int ofirst, int osecond>
+  constexpr CoordNightly<first * ofirst, second * osecond>
+  operator*(const CoordNightly<ofirst, osecond> &other) const
+  {
+    return CoordNightly<first * other.first, second * other.second>();
+  }
+
+  template <int ofirst, int osecond>
+  constexpr CoordNightly<first / ofirst, second / osecond>
+  operator/(const CoordNightly<ofirst, osecond> &other) const
+  {
+    static_assert(second != 0 && other.second != 0, "Division by zero");
+    return CoordNightly<first / other.first, second / other.second>();
+  }
+
+  constexpr __device__ CoordNightly &xor_swizzle()
+  {
+    auto i16 = (first * 32 + second) * sizeof(float) / 16;
+    auto y16 = i16 / 8;
+    auto x16 = i16 % 8;
+    auto x16_swz = y16 ^ x16;
+    auto x_swz
+      = x16_swz * 16 / sizeof(float) % 32 + second % (16 / sizeof(float));
+    second = x_swz % 32;
+    first = x_swz / 32;
+    return *this;
+  }
+
+  constexpr __device__ CoordNightly &xor_swizzle_col()
+  {
+    constexpr auto i = (first * 16 + second);
+    constexpr auto i_swz = i ^ first;
+    // auto _second = i_swz % 16;
+    // auto _first = i_swz / 16;
+    // return *this;
+    return CoordNightly<(i_swz / 16), (i_swz % 16)>();
+  }
+
+  constexpr __device__ CoordNightly &xor_swizzle_row()
+  {
+    constexpr auto i = (first * 16 + second);
+    constexpr auto i_swz = i ^ second;
+    // second = i_swz % 16;
+    // first = i_swz / 16;
+    // return *this;
+    return CoordNightly<(i_swz / 16), (i_swz % 16)>();
   }
 };
 
@@ -588,4 +662,4 @@ __device__ __forceinline__ int xor_swizzle(int o)
 
 } // namespace catz
 
-#endif // CATZILLA_RECIPES_UTILS_INDEX_UTILS_H_
+#endif // CATZILLA_CATZ_MATRIX_H_
