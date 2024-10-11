@@ -7,12 +7,12 @@
 *. add C-CACHE, set it to choreo
 *. matmul_tensor_cores.h, line 69, fix bug, cause: non-normalised loop and symbolic index calculation
 *. matmul_tensor_cores_tuned.h, line 151, bug, still slower with <=: rationale, we need compile-time value for shape and index calculation, with constexpr maybe
-
-======================= TODO ==============================
-
 *. legacy tests for tile
 *. test static tile in catch2, as __device__ func
 *. config CATCH2 and add test for constexpr design
+
+======================= TODO ==============================
+
 *. use compile-time value for Matrix design, like nalgebra | if problem comes from threadIdx.y these runtime value, try to add const value into API for (loop-extents)
 *. pack wmma into Matrix design
 *. make one faster kernel, not limit to. (need to pack fragment loading in Matrix design)
