@@ -85,3 +85,28 @@ TEST_CUDA_CASE(matrix_tile_contiguous, "matrix tile contiguous", "[matrix][tile]
   SCHECK(rhs_mat.stride.first == 32);
   SCHECK(rhs_mat.stride.second == 1);
 }
+
+TEST_CUDA_CASE(matrix_dist_to_coord, "matrix dist to coord", "[matrix][dist]") {
+  const int M_TILE = 26;
+  const int K_TILE = 32;
+  const int M_REG = 13;
+  const int K_REG = 4;
+  float lhs_data[M_TILE*K_TILE] = {0.0};
+  auto _shape = CoordNightly<M_TILE, K_TILE>();
+
+  auto lhs_mat = make_matrix(lhs_data, _shape);
+  auto _tile_shape = CoordNightly<M_REG, K_REG>();
+  auto rhs_mat = lhs_mat.tile(Coord(0, 0), _tile_shape);
+  for (int row = 0; row < M_REG; row++)
+    for (int col = 0; col < K_REG; col++)
+      rhs_mat.dist_to(Coord(row, col)) = 0.13;
+
+  SCHECK(rhs_mat.shape.first == 13);
+  SCHECK(rhs_mat.shape.second == 4);
+  SCHECK(rhs_mat.stride.first == 32);
+  SCHECK(rhs_mat.stride.second == 1);
+  // TODO: assert at device not caught by CATCH2, need fix
+  assert(rhs_mat.data[0] == 0.13);
+  assert(rhs_mat.data[3] == 0.13);
+  assert(rhs_mat.data[4] == 0.13);
+}

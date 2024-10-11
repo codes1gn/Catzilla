@@ -27,7 +27,7 @@ namespace catz {
 #define CUDA_CHECK_ERROR()                                                     \
   do {                                                                         \
     cudaError_t err = cudaGetLastError();                                      \
-    REQUIRE(err == cudaSuccess);                                               \
+    CHECK(err == cudaSuccess);                                                 \
     cudaDeviceSynchronize();                                                   \
   } while (0)
 

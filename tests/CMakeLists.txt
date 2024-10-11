@@ -2,6 +2,7 @@
 enable_testing()
 
 set(SOURCES "")
+set(TEST_BINARIES)
 
 file(GLOB_RECURSE CU_TEST_SOURCES "unittests/*_test.cu")
 list(APPEND SOURCES ${CU_TEST_SOURCES})
@@ -24,4 +25,9 @@ foreach(src ${SOURCES})
   include(Catch)
 
   catch_discover_tests(${binary})
+  list(APPEND TEST_BINARIES ${binary})
 endforeach()
+
+add_custom_target(catz_tests
+  DEPENDS ${TEST_BINARIES}
+)

@@ -81,6 +81,19 @@ debug: query-gpu-arch
 		-GNinja
 	@ninja -C $(BUILD_DIR)
 
+build-tests: query-gpu-arch
+	@mkdir -p $(BUILD_DIR)
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug .. \
+		-DCUDA_COMPUTE_CAPABILITY=$(CUDA_COMPUTE_CAPABILITY) \
+		-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+		-DCMAKE_C_COMPILER=clang \
+		-DCMAKE_CXX_COMPILER=clang++ \
+		-DCMAKE_CUDA_COMPILER=nvcc \
+		-DCMAKE_CUDA_FLAGS="-maxrregcount=128 --ptxas-options=-v --expt-relaxed-constexpr" \
+		-GNinja
+	@ninja -C $(BUILD_DIR) catz_tests
+
 
 clean:
 	@rm -rf $(BUILD_DIR)
@@ -131,7 +144,7 @@ dev4: build
 dev5: build 
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 256 -size-n 256 -size-k 256
 
-test: build
+test: build-tests 
 	@cd $(BUILD_DIR)/tests && ctest -V
 
 format:

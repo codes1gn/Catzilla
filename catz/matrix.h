@@ -236,6 +236,69 @@ struct MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<STRD, 1>> {
         make_matrix(new_data, new_shape, stride);
     return std::move(ret);
   }
+
+  constexpr inline __device__ MatrixNightly dist_to(Coord tile_var) {
+    // shape = 8 x 2
+    // y in 0-4, x in 0-4
+    MatrixNightly ret = MatrixNightly(data + tile_var.first * stride.first +
+                                          tile_var.second * stride.second,
+                                      shape, stride);
+    return std::move(ret);
+  }
+
+  constexpr inline __device__ MatrixNightly dist_to(int dist_id) {
+    int row_in_current = dist_id / shape.second;
+    int col_in_current = dist_id % shape.second;
+    MatrixNightly ret = MatrixNightly(data + row_in_current * stride.first +
+                                          col_in_current * stride.second,
+                                      shape, stride);
+    return std::move(ret);
+  }
+
+  constexpr __device__ void operator=(const MatrixNightly &other) {
+    *data = *other.data;
+  }
+
+  constexpr __device__ void operator=(const T other_scalar) {
+    *data = other_scalar;
+  }
+
+  // TODO: merge generics
+  // half <= float
+  template <typename U = T, typename CoordType, typename CoordType2>
+  constexpr inline __device__
+      typename std::enable_if<std::is_same<U, half>::value, void>::type
+      operator=(const MatrixNightly<float, CoordType, CoordType2> &other) {
+    *data = __float2half(*other.data);
+  }
+
+  // float <= half
+  template <typename U = T, typename CoordType, typename CoordType2>
+  constexpr inline __device__
+      typename std::enable_if<std::is_same<U, float>::value, void>::type
+      operator=(const MatrixNightly<half, CoordType, CoordType2> &other) {
+    *data = __half2float(*other.data);
+  }
+
+  template <typename U = T>
+  constexpr inline __device__
+      typename std::enable_if<std::is_same<U, half>::value, void>::type
+      operator=(const float other_scalar) {
+    *data = __float2half(other_scalar);
+  }
+
+  template <typename U = T>
+  constexpr inline __device__
+      typename std::enable_if<std::is_same<U, float>::value, void>::type
+      print() const {
+    for (size_t i = 0; i < shape.first; ++i) {
+      for (size_t j = 0; j < shape.second; ++j) {
+        std::cout << data[i * shape.first + j * shape.second] << " ";
+      }
+      std::cout << "\n";
+    }
+    std::cout << std::endl;
+  }
 };
 
 // Default builder:
