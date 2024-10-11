@@ -266,9 +266,9 @@ struct MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<STRD, 1>> {
 
   // TODO: make it device'd code
   template <int NROWS, int NCOLS>
-  constexpr inline MatrixNightly<T, CoordNightly<NROWS, NCOLS>,
-                                 CoordNightly<STRD, 1>>
-  tile(Coord tile_var, CoordNightly<NROWS, NCOLS> new_shape)
+  constexpr inline __device__
+    MatrixNightly<T, CoordNightly<NROWS, NCOLS>, CoordNightly<STRD, 1>>
+    tile(Coord tile_var, CoordNightly<NROWS, NCOLS> new_shape)
   {
     T *new_data = data + tile_var.first * new_shape.first * stride.first
                   + tile_var.second * new_shape.second * stride.second;
@@ -278,20 +278,20 @@ struct MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<STRD, 1>> {
   }
 };
 
-// Default helper func:
+// Default builder:
 // (T*, CoordType, CoordType) -> Matrix
 // auto matrix = make_matrix(data, Coord<16, 32>(), Coord<32, 1>())
 template <typename T, typename CoordType, typename CoordType2>
-MatrixNightly<T, CoordType, CoordType2> make_matrix(T *data, CoordType shape,
-                                                    CoordType2 stride)
+__device__ MatrixNightly<T, CoordType, CoordType2>
+make_matrix(T *data, CoordType shape, CoordType2 stride)
 {
   return MatrixNightly<T, CoordType, CoordType2>(data, shape, stride);
 }
 
-// Specialised helper for contiguous memory
+// Specialised builder for contiguous memory
 // (T*, CoordType) -> Matrix
 template <typename T, int ROWS, int COLS>
-MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<COLS, 1>>
+__device__ MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<COLS, 1>>
 make_matrix(T *data, CoordNightly<ROWS, COLS> shape)
 {
   return MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<COLS, 1>>(
