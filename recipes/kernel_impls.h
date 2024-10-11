@@ -10,13 +10,11 @@
 #include "matmul/matmul_vanilla.h"
 #include "matmul/matmul_vload_vstore.h"
 
-namespace catz::recipes
-{
+namespace catz::recipes {
 
 // TODO: use catz::recipes namespace
 inline void matmul_exec(int impl_idx, int M, int N, int K, float alpha,
-                        float *A, float *B, float beta, float *C)
-{
+                        float *A, float *B, float beta, float *C) {
   if (impl_idx == 1) {
     matmul_f16f32(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 2) {

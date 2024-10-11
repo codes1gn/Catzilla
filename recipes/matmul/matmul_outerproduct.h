@@ -15,8 +15,7 @@ using namespace catz::cuda;
 using namespace catz::wmma;
 using namespace catz::mma;
 
-namespace catz::recipes
-{
+namespace catz::recipes {
 
 /////////////////////////////////////////////////////////////////////////////////
 /// version 2:
@@ -28,8 +27,7 @@ template <const int M_TILE_SM, const int N_TILE_SM, const int K_TILE_SM,
           const int M_TILE_REG, const int N_TILE_REG>
 __global__ void _matmul_outerproduct(int M, int N, int K, float alpha,
                                      float *lhs, float *rhs, float beta,
-                                     float *out)
-{
+                                     float *out) {
   int bid_x = blockIdx.x;
   int bid_y = blockIdx.y;
 
@@ -47,8 +45,7 @@ __global__ void _matmul_outerproduct(int M, int N, int K, float alpha,
   for (int mreg = 0; mreg < M_TILE_REG; mreg++) {
     for (int nreg = 0; nreg < N_TILE_REG; nreg++) {
       out_shared[distribute_(tid_x * N_TILE_REG + nreg,
-                             tid_y * M_TILE_REG + mreg, 1, N_TILE_SM)]
-        = 0.;
+                             tid_y * M_TILE_REG + mreg, 1, N_TILE_SM)] = 0.;
     }
   }
 
@@ -59,14 +56,14 @@ __global__ void _matmul_outerproduct(int M, int N, int K, float alpha,
     // use distribute_ for in-tile thread calculation
     // use tile_ for out-tile thread calculation
     for (int mreg = 0; mreg < M_TILE_REG; mreg++) {
-      lhs_shared[distribute_(tid_x, tid_y * M_TILE_REG + mreg, 1, K_TILE_SM)]
-        = lhs[tiling_(bid_y, k, M_TILE_SM, K_TILE_SM, K, 1)
-              + distribute_(tid_x, tid_y * M_TILE_REG + mreg, 1, K)];
+      lhs_shared[distribute_(tid_x, tid_y * M_TILE_REG + mreg, 1, K_TILE_SM)] =
+          lhs[tiling_(bid_y, k, M_TILE_SM, K_TILE_SM, K, 1) +
+              distribute_(tid_x, tid_y * M_TILE_REG + mreg, 1, K)];
     }
     for (int nreg = 0; nreg < N_TILE_REG; nreg++) {
-      rhs_shared[distribute_(tid_x * N_TILE_REG + nreg, tid_y, 1, N_TILE_SM)]
-        = rhs[tiling_(k, bid_x, K_TILE_SM, N_TILE_SM, N, 1)
-              + distribute_(tid_x * N_TILE_REG + nreg, tid_y, 1, N)];
+      rhs_shared[distribute_(tid_x * N_TILE_REG + nreg, tid_y, 1, N_TILE_SM)] =
+          rhs[tiling_(k, bid_x, K_TILE_SM, N_TILE_SM, N, 1) +
+              distribute_(tid_x * N_TILE_REG + nreg, tid_y, 1, N)];
     }
     __syncthreads();
 
@@ -90,17 +87,16 @@ __global__ void _matmul_outerproduct(int M, int N, int K, float alpha,
       // N) + distribute_(mreg, nreg, N, 1)] =
       // out_shared[distribute_(tid_x*N_TILE_REG, tid_y*M_TILE_REG, 1,
       // N_TILE_SM) + distribute_(mreg, nreg, N_TILE_SM, 1)];
-      out[tiling_(bid_y, bid_x, M_TILE_SM, N_TILE_SM, N, 1)
-          + distribute_(tid_x * N_TILE_REG, tid_y * M_TILE_REG, 1, N)
-          + distribute_(mreg, nreg, N, 1)]
-        = alpha * partial_sum[mreg * N_TILE_REG + nreg];
+      out[tiling_(bid_y, bid_x, M_TILE_SM, N_TILE_SM, N, 1) +
+          distribute_(tid_x * N_TILE_REG, tid_y * M_TILE_REG, 1, N) +
+          distribute_(mreg, nreg, N, 1)] =
+          alpha * partial_sum[mreg * N_TILE_REG + nreg];
     }
   }
 }
 
 void matmul_outerproduct(int M, int N, int K, float alpha, float *A, float *B,
-                         float beta, float *C)
-{
+                         float beta, float *C) {
   const int M_TILE = 64;
   const int N_TILE = 64;
   const int K_TILE = 16;
@@ -112,7 +108,7 @@ void matmul_outerproduct(int M, int N, int K, float alpha, float *A, float *B,
                        cudaFuncAttributePreferredSharedMemoryCarveout,
                        cudaSharedmemCarveoutMaxShared);
   _matmul_outerproduct<M_TILE, N_TILE, K_TILE, mreg, nreg>
-    <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
 } // namespace catz::recipes

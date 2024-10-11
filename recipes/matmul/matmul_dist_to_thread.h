@@ -16,16 +16,14 @@ using namespace catz::cuda;
 using namespace catz::wmma;
 using namespace catz::mma;
 
-namespace catz::recipes
-{
+namespace catz::recipes {
 
 template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
           const int N_REG, const int K_REG, const int X_THREAD,
           const int Y_THREAD>
 __global__ void _matmul_dist_to_thread(int M, int N, int K, float alpha,
                                        float *lhs, float *rhs, float beta,
-                                       float *out)
-{
+                                       float *out) {
   auto lhs_shape = make_coord(M, K);
   auto rhs_shape = make_coord(K, N);
   auto out_shape = make_coord(M, N);
@@ -60,26 +58,28 @@ __global__ void _matmul_dist_to_thread(int M, int N, int K, float alpha,
       for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
         // TODO: span_as(y * 4, x / 4)
         int x = threadIdx.y * X_THREAD + threadIdx.x;
-        lhs_shared_mat.tile(Coord(m, kin), lhs_reg_tile_shape).dist_to_thread()
-          = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-              .tile(Coord(m, kin), lhs_reg_tile_shape)
-              .dist_to_thread();
+        lhs_shared_mat.tile(Coord(m, kin), lhs_reg_tile_shape)
+            .dist_to_thread() =
+            lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+                .tile(Coord(m, kin), lhs_reg_tile_shape)
+                .dist_to_thread();
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-        rhs_shared_mat.tile(Coord(kin, n), rhs_reg_tile_shape).dist_to_thread()
-          = rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
-              .tile(Coord(kin, n), rhs_reg_tile_shape)
-              .dist_to_thread();
+        rhs_shared_mat.tile(Coord(kin, n), rhs_reg_tile_shape)
+            .dist_to_thread() =
+            rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
+                .tile(Coord(kin, n), rhs_reg_tile_shape)
+                .dist_to_thread();
       }
     }
     __syncthreads();
 
     // contract at 128x128x32 micro-kernel
     matmul_kernel_coalesced<M_TILE, N_TILE, K_TILE, Y_THREAD, X_THREAD>(
-      lhs_shared_mat.data, rhs_shared_mat.data, partial_sum.data);
+        lhs_shared_mat.data, rhs_shared_mat.data, partial_sum.data);
     // identity<16, 16>(
     //   rhs_shared_mat,
     //   out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape));
@@ -93,16 +93,14 @@ __global__ void _matmul_dist_to_thread(int M, int N, int K, float alpha,
       //   .tile(Coord(m, n), Coord(Y_THREAD, X_THREAD))
       //   <= partial_sum;
       out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-        .tile(Coord(m, n), Coord(Y_THREAD, X_THREAD))
-        .dist_to_thread()
-        = partial_sum.dist_to(Coord(m, n));
+          .tile(Coord(m, n), Coord(Y_THREAD, X_THREAD))
+          .dist_to_thread() = partial_sum.dist_to(Coord(m, n));
     }
   }
 }
 
 void matmul_dist_to_thread(int M, int N, int K, float alpha, float *A, float *B,
-                           float beta, float *C)
-{
+                           float beta, float *C) {
   const int M_TILE = 128;
   const int K_TILE = 32;
   const int N_TILE = 128;
@@ -122,7 +120,7 @@ void matmul_dist_to_thread(int M, int N, int K, float alpha, float *A, float *B,
                        cudaSharedmemCarveoutMaxShared);
   _matmul_dist_to_thread<M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, X_THREAD,
                          Y_THREAD>
-    <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 
   // const int M_TILE = 16;
   // const int K_TILE = 8;

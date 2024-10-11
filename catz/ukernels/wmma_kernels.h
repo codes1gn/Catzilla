@@ -12,8 +12,7 @@
 
 using namespace catz;
 
-namespace catz::wmma
-{
+namespace catz::wmma {
 
 // // C += A * B
 // // m16.n16.k16
@@ -72,15 +71,14 @@ namespace catz::wmma
 // }
 
 inline __device__ void mma_m16n16k16_f16_f32_ptx(half *a_half, half *b_half,
-                                                 float *c)
-{
+                                                 float *c) {
   // Declare the fragments
   nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, 16, 16, 16, half,
                          nvcuda::wmma::row_major>
-    a_frag;
+      a_frag;
   nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, 16, 16, 16, half,
                          nvcuda::wmma::row_major>
-    b_frag;
+      b_frag;
   nvcuda::wmma::fragment<nvcuda::wmma::accumulator, 16, 16, 16, float> c_frag;
 
   // nvcuda::wmma::fill_fragment(C_frag, 0.0f);

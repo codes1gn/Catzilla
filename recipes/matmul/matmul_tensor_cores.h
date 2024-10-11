@@ -15,8 +15,7 @@ using namespace catz::cuda;
 using namespace catz::wmma;
 using namespace catz::mma;
 
-namespace catz::recipes
-{
+namespace catz::recipes {
 
 template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
           const int N_REG, const int K_REG, const int X_THREAD,
@@ -24,8 +23,7 @@ template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
 __global__ void
 _matmul_tensor_cores_wmma_m16n16k16_f16f32(int M, int N, int K, float alpha,
                                            float *lhs, float *rhs, float beta,
-                                           float *out)
-{
+                                           float *out) {
   auto lhs_shape = make_coord(M, K);
   auto rhs_shape = make_coord(K, N);
   auto out_shape = make_coord(M, N);
@@ -67,9 +65,9 @@ _matmul_tensor_cores_wmma_m16n16k16_f16f32(int M, int N, int K, float alpha,
 
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
     for (int kin = 0; kin < CEIL_DIV(K_TILE, 16); kin++) {
-      lhs_shared_mat.tile(Coord(0, kin), Coord(M_TILE, 16))
-        <= lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-             .tile(Coord(0, kin), Coord(M_TILE, 16));
+      lhs_shared_mat.tile(Coord(0, kin), Coord(M_TILE, 16)) <=
+          lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+              .tile(Coord(0, kin), Coord(M_TILE, 16));
     }
     rhs_shared_mat <= rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape);
     __syncthreads();
@@ -79,14 +77,13 @@ _matmul_tensor_cores_wmma_m16n16k16_f16f32(int M, int N, int K, float alpha,
   }
   __syncthreads();
 
-  out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-    <= out_shared_mat;
+  out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape) <=
+      out_shared_mat;
 }
 
 void matmul_tensor_cores_wmma_m16n16k16_f16f32(int M, int N, int K, float alpha,
                                                float *A, float *B, float beta,
-                                               float *C)
-{
+                                               float *C) {
   const int M_TILE = 16;
   const int K_TILE = 16;
   const int N_TILE = 16;
@@ -101,13 +98,13 @@ void matmul_tensor_cores_wmma_m16n16k16_f16f32(int M, int N, int K, float alpha,
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(X_THREAD, Y_THREAD);
   cudaFuncSetAttribute(
-    _matmul_tensor_cores_wmma_m16n16k16_f16f32<
-      M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, X_THREAD, Y_THREAD>,
-    cudaFuncAttributePreferredSharedMemoryCarveout,
-    cudaSharedmemCarveoutMaxShared);
+      _matmul_tensor_cores_wmma_m16n16k16_f16f32<
+          M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, X_THREAD, Y_THREAD>,
+      cudaFuncAttributePreferredSharedMemoryCarveout,
+      cudaSharedmemCarveoutMaxShared);
   _matmul_tensor_cores_wmma_m16n16k16_f16f32<M_TILE, N_TILE, K_TILE, M_REG,
                                              N_REG, K_REG, X_THREAD, Y_THREAD>
-    <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
   return;
 }
 
@@ -117,8 +114,7 @@ template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
 __global__ void _matmul_tensor_cores_mma_m16n8k8_f16f32(int M, int N, int K,
                                                         float alpha, float *lhs,
                                                         float *rhs, float beta,
-                                                        float *out)
-{
+                                                        float *out) {
   auto lhs_shape = make_coord(M, K);
   auto rhs_shape = make_coord(K, N);
   auto out_shape = make_coord(M, N);
@@ -164,17 +160,19 @@ __global__ void _matmul_tensor_cores_mma_m16n8k8_f16f32(int M, int N, int K,
     for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, K_TILE)); m++) {
 #pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, K_TILE); kin++) {
-        lhs_shared_mat.tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
-          <= lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-               .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE));
+        lhs_shared_mat.tile(Coord(m, kin),
+                            Coord(CEIL_DIV(32, K_TILE), K_TILE)) <=
+            lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+                .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE));
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, CEIL_DIV(32, N_TILE)); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, N_TILE); n++) {
-        rhs_shared_mat.tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-          <= rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-               .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE));
+        rhs_shared_mat.tile(Coord(kin, n),
+                            Coord(CEIL_DIV(32, N_TILE), N_TILE)) <=
+            rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+                .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE));
       }
     }
     __syncthreads();
@@ -194,8 +192,8 @@ __global__ void _matmul_tensor_cores_mma_m16n8k8_f16f32(int M, int N, int K,
 
   for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, N_TILE)); m++) {
     out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-        .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-      <= out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE));
+            .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE)) <=
+        out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE));
   }
   // out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape) <=
   // out_shared_mat;
@@ -203,8 +201,7 @@ __global__ void _matmul_tensor_cores_mma_m16n8k8_f16f32(int M, int N, int K,
 
 void matmul_tensor_cores_mma_m16n8k8_f16f32(int M, int N, int K, float alpha,
                                             float *A, float *B, float beta,
-                                            float *C)
-{
+                                            float *C) {
   const int M_TILE = 16;
   const int K_TILE = 8;
   const int N_TILE = 8;
@@ -219,24 +216,23 @@ void matmul_tensor_cores_mma_m16n8k8_f16f32(int M, int N, int K, float alpha,
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(X_THREAD, Y_THREAD);
   cudaFuncSetAttribute(
-    _matmul_tensor_cores_mma_m16n8k8_f16f32<M_TILE, N_TILE, K_TILE, M_REG,
-                                            N_REG, K_REG, X_THREAD, Y_THREAD>,
-    cudaFuncAttributePreferredSharedMemoryCarveout,
-    cudaSharedmemCarveoutMaxShared);
+      _matmul_tensor_cores_mma_m16n8k8_f16f32<M_TILE, N_TILE, K_TILE, M_REG,
+                                              N_REG, K_REG, X_THREAD, Y_THREAD>,
+      cudaFuncAttributePreferredSharedMemoryCarveout,
+      cudaSharedmemCarveoutMaxShared);
   _matmul_tensor_cores_mma_m16n8k8_f16f32<M_TILE, N_TILE, K_TILE, M_REG, N_REG,
                                           K_REG, X_THREAD, Y_THREAD>
-    <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
   return;
 }
 
 template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
           const int N_REG, const int K_REG, const int X_THREAD,
           const int Y_THREAD>
-__global__ void _matmul_tensor_cores_mma_m16n8k16_f16f32(int M, int N, int K,
-                                                         float alpha,
-                                                         float *lhs, float *rhs,
-                                                         float beta, float *out)
-{
+__global__ void
+_matmul_tensor_cores_mma_m16n8k16_f16f32(int M, int N, int K, float alpha,
+                                         float *lhs, float *rhs, float beta,
+                                         float *out) {
   auto lhs_shape = make_coord(M, K);
   auto rhs_shape = make_coord(K, N);
   auto out_shape = make_coord(M, N);
@@ -283,20 +279,20 @@ __global__ void _matmul_tensor_cores_mma_m16n8k16_f16f32(int M, int N, int K,
 #pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, K_TILE); kin++) {
         lhs_shared_mat.tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
-          .dist_to_thread()
-          = lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-              .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
-              .dist_to_thread();
+            .dist_to_thread() =
+            lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+                .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
+                .dist_to_thread();
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, CEIL_DIV(32, N_TILE)); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, N_TILE); n++) {
         rhs_shared_mat.tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-          .dist_to_thread()
-          = rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-              .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-              .dist_to_thread();
+            .dist_to_thread() =
+            rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+                .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+                .dist_to_thread();
       }
     }
     __syncthreads();
@@ -315,17 +311,16 @@ __global__ void _matmul_tensor_cores_mma_m16n8k16_f16f32(int M, int N, int K,
   for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, N_TILE)); m++) {
 #pragma unroll
     out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-      .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-      .dist_to_thread()
-      = out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-          .dist_to_thread();
+        .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+        .dist_to_thread() =
+        out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+            .dist_to_thread();
   }
 }
 
 void matmul_tensor_cores_mma_m16n8k16_f16f32(int M, int N, int K, float alpha,
                                              float *A, float *B, float beta,
-                                             float *C)
-{
+                                             float *C) {
   const int M_TILE = 16;
   const int K_TILE = 16;
   const int N_TILE = 8;
@@ -340,24 +335,23 @@ void matmul_tensor_cores_mma_m16n8k16_f16f32(int M, int N, int K, float alpha,
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(X_THREAD, Y_THREAD);
   cudaFuncSetAttribute(
-    _matmul_tensor_cores_mma_m16n8k16_f16f32<M_TILE, N_TILE, K_TILE, M_REG,
-                                             N_REG, K_REG, X_THREAD, Y_THREAD>,
-    cudaFuncAttributePreferredSharedMemoryCarveout,
-    cudaSharedmemCarveoutMaxShared);
+      _matmul_tensor_cores_mma_m16n8k16_f16f32<
+          M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, X_THREAD, Y_THREAD>,
+      cudaFuncAttributePreferredSharedMemoryCarveout,
+      cudaSharedmemCarveoutMaxShared);
   _matmul_tensor_cores_mma_m16n8k16_f16f32<M_TILE, N_TILE, K_TILE, M_REG, N_REG,
                                            K_REG, X_THREAD, Y_THREAD>
-    <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
   return;
 }
 
 template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
           const int N_REG, const int K_REG, const int X_THREAD,
           const int Y_THREAD>
-__global__ void _matmul_tensor_cores_mma_m16n8k8_tf32f32(int M, int N, int K,
-                                                         float alpha,
-                                                         float *lhs, float *rhs,
-                                                         float beta, float *out)
-{
+__global__ void
+_matmul_tensor_cores_mma_m16n8k8_tf32f32(int M, int N, int K, float alpha,
+                                         float *lhs, float *rhs, float beta,
+                                         float *out) {
   auto lhs_shape = make_coord(M, K);
   auto rhs_shape = make_coord(K, N);
   auto out_shape = make_coord(M, N);
@@ -404,20 +398,20 @@ __global__ void _matmul_tensor_cores_mma_m16n8k8_tf32f32(int M, int N, int K,
 #pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, K_TILE); kin++) {
         lhs_shared_mat.tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
-          .dist_to_thread()
-          = lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-              .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
-              .dist_to_thread();
+            .dist_to_thread() =
+            lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+                .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
+                .dist_to_thread();
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, CEIL_DIV(32, N_TILE)); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, N_TILE); n++) {
         rhs_shared_mat.tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-          .dist_to_thread()
-          = rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-              .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-              .dist_to_thread();
+            .dist_to_thread() =
+            rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+                .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+                .dist_to_thread();
       }
     }
     __syncthreads();
@@ -435,17 +429,16 @@ __global__ void _matmul_tensor_cores_mma_m16n8k8_tf32f32(int M, int N, int K,
 
   for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, N_TILE)); m++) {
     out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-      .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-      .dist_to_thread()
-      = out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-          .dist_to_thread();
+        .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+        .dist_to_thread() =
+        out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+            .dist_to_thread();
   }
 }
 
 void matmul_tensor_cores_mma_m16n8k8_tf32f32(int M, int N, int K, float alpha,
                                              float *A, float *B, float beta,
-                                             float *C)
-{
+                                             float *C) {
   const int M_TILE = 16;
   const int K_TILE = 8;
   const int N_TILE = 8;
@@ -460,24 +453,23 @@ void matmul_tensor_cores_mma_m16n8k8_tf32f32(int M, int N, int K, float alpha,
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(X_THREAD, Y_THREAD);
   cudaFuncSetAttribute(
-    _matmul_tensor_cores_mma_m16n8k8_tf32f32<M_TILE, N_TILE, K_TILE, M_REG,
-                                             N_REG, K_REG, X_THREAD, Y_THREAD>,
-    cudaFuncAttributePreferredSharedMemoryCarveout,
-    cudaSharedmemCarveoutMaxShared);
+      _matmul_tensor_cores_mma_m16n8k8_tf32f32<
+          M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, X_THREAD, Y_THREAD>,
+      cudaFuncAttributePreferredSharedMemoryCarveout,
+      cudaSharedmemCarveoutMaxShared);
   _matmul_tensor_cores_mma_m16n8k8_tf32f32<M_TILE, N_TILE, K_TILE, M_REG, N_REG,
                                            K_REG, X_THREAD, Y_THREAD>
-    <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
   return;
 }
 
 template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
           const int N_REG, const int K_REG, const int X_THREAD,
           const int Y_THREAD>
-__global__ void _matmul_tensor_cores_mma_m16n8k4_tf32f32(int M, int N, int K,
-                                                         float alpha,
-                                                         float *lhs, float *rhs,
-                                                         float beta, float *out)
-{
+__global__ void
+_matmul_tensor_cores_mma_m16n8k4_tf32f32(int M, int N, int K, float alpha,
+                                         float *lhs, float *rhs, float beta,
+                                         float *out) {
   auto lhs_shape = make_coord(M, K);
   auto rhs_shape = make_coord(K, N);
   auto out_shape = make_coord(M, N);
@@ -524,20 +516,20 @@ __global__ void _matmul_tensor_cores_mma_m16n8k4_tf32f32(int M, int N, int K,
 #pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, K_TILE); kin++) {
         lhs_shared_mat.tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
-          .dist_to_thread()
-          = lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-              .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
-              .dist_to_thread();
+            .dist_to_thread() =
+            lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
+                .tile(Coord(m, kin), Coord(CEIL_DIV(32, K_TILE), K_TILE))
+                .dist_to_thread();
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, CEIL_DIV(32, N_TILE)); kin++) {
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, N_TILE); n++) {
         rhs_shared_mat.tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-          .dist_to_thread()
-          = rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-              .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-              .dist_to_thread();
+            .dist_to_thread() =
+            rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
+                .tile(Coord(kin, n), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+                .dist_to_thread();
       }
     }
     __syncthreads();
@@ -556,17 +548,16 @@ __global__ void _matmul_tensor_cores_mma_m16n8k4_tf32f32(int M, int N, int K,
   for (int m = 0; m < CEIL_DIV(M_TILE, CEIL_DIV(32, N_TILE)); m++) {
 #pragma unroll
     out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-      .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-      .dist_to_thread()
-      = out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
-          .dist_to_thread();
+        .tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+        .dist_to_thread() =
+        out_shared_mat.tile(Coord(m, 0), Coord(CEIL_DIV(32, N_TILE), N_TILE))
+            .dist_to_thread();
   }
 }
 
 void matmul_tensor_cores_mma_m16n8k4_tf32f32(int M, int N, int K, float alpha,
                                              float *A, float *B, float beta,
-                                             float *C)
-{
+                                             float *C) {
   const int M_TILE = 16;
   const int K_TILE = 4;
   const int N_TILE = 8;
@@ -581,13 +572,13 @@ void matmul_tensor_cores_mma_m16n8k4_tf32f32(int M, int N, int K, float alpha,
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(X_THREAD, Y_THREAD);
   cudaFuncSetAttribute(
-    _matmul_tensor_cores_mma_m16n8k4_tf32f32<M_TILE, N_TILE, K_TILE, M_REG,
-                                             N_REG, K_REG, X_THREAD, Y_THREAD>,
-    cudaFuncAttributePreferredSharedMemoryCarveout,
-    cudaSharedmemCarveoutMaxShared);
+      _matmul_tensor_cores_mma_m16n8k4_tf32f32<
+          M_TILE, N_TILE, K_TILE, M_REG, N_REG, K_REG, X_THREAD, Y_THREAD>,
+      cudaFuncAttributePreferredSharedMemoryCarveout,
+      cudaSharedmemCarveoutMaxShared);
   _matmul_tensor_cores_mma_m16n8k4_tf32f32<M_TILE, N_TILE, K_TILE, M_REG, N_REG,
                                            K_REG, X_THREAD, Y_THREAD>
-    <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
   return;
 }
 

@@ -13,17 +13,15 @@
 
 using namespace catz;
 
-namespace catz::mma
-{
+namespace catz::mma {
 
 inline __device__ void initialize_unsigned_half(unsigned *A, int elems,
-                                                half value)
-{
+                                                half value) {
   // half 类型 1.0 的二进制表示为 0x3C00
-  unsigned short half_value
-    = __half_as_short(value); // 取得 half 类型值的二进制表示
-  unsigned packed_value
-    = half_value | (half_value << 16); // 将两个 half 值打包成一个 unsigned 值
+  unsigned short half_value =
+      __half_as_short(value); // 取得 half 类型值的二进制表示
+  unsigned packed_value =
+      half_value | (half_value << 16); // 将两个 half 值打包成一个 unsigned 值
 
   // 初始化 unsigned 数组
   for (int i = 0; i < elems; i++) {
@@ -32,8 +30,7 @@ inline __device__ void initialize_unsigned_half(unsigned *A, int elems,
 }
 
 inline __device__ void initialize_unsigned_tf32(unsigned *A, int elems,
-                                                float value)
-{
+                                                float value) {
   for (int i = 0; i < elems; i++) {
     uint32_t b;
     asm volatile("cvt.rna.tf32.f32 %0, %1;\n" : "=r"(b) : "f"(value));
@@ -42,8 +39,8 @@ inline __device__ void initialize_unsigned_tf32(unsigned *A, int elems,
 }
 
 inline __device__ void mma_m16n8k16_f16f32_neo(Matrix<float> d, Matrix<half> a,
-                                               Matrix<half> b, Matrix<float> c)
-{
+                                               Matrix<half> b,
+                                               Matrix<float> c) {
   unsigned A[4];
   unsigned B[2];
   float C[4];
@@ -69,8 +66,7 @@ inline __device__ void mma_m16n8k16_f16f32_neo(Matrix<float> d, Matrix<half> a,
 // TODO: align naming with ptx manual
 // TODO: need housekeeping
 inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
-                                           const half *b, const float *c)
-{
+                                           const half *b, const float *c) {
   int lane_id = threadIdx.x % 32;
   int group_id = lane_id / 4; // id of quad group where 32 threads are arranged
   int thread_in_group = lane_id % 4;
@@ -89,9 +85,9 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
 
   // TODO: pack all these abstractions back to Matrix
   asm volatile(
-    "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
-    : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
-    : "r"(get_smem_ptr(a_new)));
+      "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
+      : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
+      : "r"(get_smem_ptr(a_new)));
 
   int uord = lane_id / 8;
   int uord_id = lane_id % 8;
@@ -135,8 +131,7 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
 }
 
 inline __device__ void mma_m16n8k8_f16f32_neo(Matrix<float> d, Matrix<half> a,
-                                              Matrix<half> b, Matrix<float> c)
-{
+                                              Matrix<half> b, Matrix<float> c) {
   // TODO:
   // make decl inside
   // wrap mma.sync as kernel itself
@@ -165,8 +160,7 @@ inline __device__ void mma_m16n8k8_f16f32_neo(Matrix<float> d, Matrix<half> a,
 }
 
 inline __device__ void mma_m16n8k8_f16f32(float *d, const half *a,
-                                          const half *b, const float *c)
-{
+                                          const half *b, const float *c) {
   int lane_id = threadIdx.x % 32;
 
   unsigned A[2];
@@ -249,8 +243,7 @@ inline __device__ void mma_m16n8k8_f16f32(float *d, const half *a,
 // }
 
 inline __device__ void mma_m16n8k8_tf32f32(float *d, const float *a,
-                                           const float *b, const float *c)
-{
+                                           const float *b, const float *c) {
   int lane_id = threadIdx.x % 32;
 
   unsigned A[4];
@@ -268,9 +261,9 @@ inline __device__ void mma_m16n8k8_tf32f32(float *d, const float *a,
 
   // TODO: pack all these abstractions back to Matrix
   asm volatile(
-    "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
-    : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
-    : "r"(get_smem_ptr(a_new)));
+      "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
+      : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
+      : "r"(get_smem_ptr(a_new)));
 
   int uord = lane_id / 16;
   int uord_id = (lane_id % 16);
@@ -313,8 +306,7 @@ inline __device__ void mma_m16n8k8_tf32f32(float *d, const float *a,
 }
 
 inline __device__ void mma_m16n8k4_tf32f32(float *d, const float *a,
-                                           const float *b, const float *c)
-{
+                                           const float *b, const float *c) {
   int lane_id = threadIdx.x % 32;
 
   unsigned A[2];

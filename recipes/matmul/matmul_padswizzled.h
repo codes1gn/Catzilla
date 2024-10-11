@@ -15,8 +15,7 @@ using namespace catz::cuda;
 using namespace catz::wmma;
 using namespace catz::mma;
 
-namespace catz::recipes
-{
+namespace catz::recipes {
 
 // hand tuned for HPs
 // use templated kernel
@@ -25,8 +24,7 @@ template <const int M_TILE, const int N_TILE, const int K_TILE,
           const int X_THREAD, const int Y_THREAD>
 __global__ void _matmul_pad_swizzled(int M, int N, int K, float alpha,
                                      float *lhs, float *rhs, float beta,
-                                     float *out)
-{
+                                     float *out) {
   auto lhs_shape = make_coord(M, K);
   auto rhs_shape = make_coord(K, N);
   auto out_shape = make_coord(M, N);
@@ -59,12 +57,12 @@ __global__ void _matmul_pad_swizzled(int M, int N, int K, float alpha,
 #pragma unroll
       for (int kin = 0; kin < CEIL_DIV(K_TILE, X_THREAD); kin++) {
         lhs_shared_mat.tile(Coord(m, kin), per_block_data_shape)
-          .dist_to(Coord(threadIdx.y, threadIdx.x))
-          // .dist_to(Coord(threadId / K_TILE, threadId % K_TILE))
-          = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-              .tile(Coord(m, kin), per_block_data_shape)
-              // .dist_to(Coord(threadId / K_TILE, threadId % K_TILE));
-              .dist_to(Coord(threadIdx.y, threadIdx.x));
+            .dist_to(Coord(threadIdx.y, threadIdx.x))
+            // .dist_to(Coord(threadId / K_TILE, threadId % K_TILE))
+            = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+                  .tile(Coord(m, kin), per_block_data_shape)
+                  // .dist_to(Coord(threadId / K_TILE, threadId % K_TILE));
+                  .dist_to(Coord(threadIdx.y, threadIdx.x));
         // lhs_shared[m * Y_THREAD * (K_TILE+1) + kin * X_THREAD + threadIdx.y *
         // (K_TILE+1) + threadIdx.x]
         //   = lhs_mat
@@ -78,17 +76,17 @@ __global__ void _matmul_pad_swizzled(int M, int N, int K, float alpha,
 #pragma unroll
       for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
         rhs_shared_mat.tile(Coord(kin, n), per_block_data_shape)
-          .dist_to(Coord(threadIdx.y, threadIdx.x))
-          = rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
-              .tile(Coord(kin, n), per_block_data_shape)
-              .dist_to(Coord(threadIdx.y, threadIdx.x));
+            .dist_to(Coord(threadIdx.y, threadIdx.x)) =
+            rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
+                .tile(Coord(kin, n), per_block_data_shape)
+                .dist_to(Coord(threadIdx.y, threadIdx.x));
       }
     }
     __syncthreads();
 
     // contract at 128x128x32 micro-kernel
     matmul_kernel_pad_swizzled<M_TILE, N_TILE, K_TILE, Y_THREAD, X_THREAD>(
-      lhs_shared_mat.data, rhs_shared_mat.data, partial_sum.data);
+        lhs_shared_mat.data, rhs_shared_mat.data, partial_sum.data);
   }
   __syncthreads();
 
@@ -96,16 +94,15 @@ __global__ void _matmul_pad_swizzled(int M, int N, int K, float alpha,
 #pragma unroll
     for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
       out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-        .tile(Coord(m, n), per_block_data_shape)
-        .dist_to(Coord(threadIdx.y, threadIdx.x))
-        = partial_sum.dist_to(Coord(m, n));
+          .tile(Coord(m, n), per_block_data_shape)
+          .dist_to(Coord(threadIdx.y, threadIdx.x)) =
+          partial_sum.dist_to(Coord(m, n));
     }
   }
 }
 
 void matmul_pad_swizzled(int M, int N, int K, float alpha, float *A, float *B,
-                         float beta, float *C)
-{
+                         float beta, float *C) {
   // for bench
   // sec 1, determine, gridDim
   const int M_TILE = 128;
@@ -128,11 +125,11 @@ void matmul_pad_swizzled(int M, int N, int K, float alpha, float *A, float *B,
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(X_THREAD, Y_THREAD);
   cudaFuncSetAttribute(
-    _matmul_pad_swizzled<M_TILE, N_TILE, K_TILE, X_THREAD, Y_THREAD>,
-    cudaFuncAttributePreferredSharedMemoryCarveout,
-    cudaSharedmemCarveoutMaxShared);
+      _matmul_pad_swizzled<M_TILE, N_TILE, K_TILE, X_THREAD, Y_THREAD>,
+      cudaFuncAttributePreferredSharedMemoryCarveout,
+      cudaSharedmemCarveoutMaxShared);
   _matmul_pad_swizzled<M_TILE, N_TILE, K_TILE, X_THREAD, Y_THREAD>
-    <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
 } // namespace catz::recipes

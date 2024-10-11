@@ -1,8 +1,7 @@
 #ifndef CATZILLA_CATZ_MACRO_H_
 #define CATZILLA_CATZ_MACRO_H_
 
-namespace catz
-{
+namespace catz {
 
 // KERNEL UTILS
 #define CEIL_DIV(dividend, divisor) (((dividend) + (divisor)-1) / (divisor))
@@ -34,8 +33,7 @@ namespace catz
 
 #define TEST_CUDA_CASE(kernel_name, case_name, tags)                           \
   __global__ void CUDA_KERNEL_NAME(kernel_name)();                             \
-  TEST_CASE(case_name, tags)                                                   \
-  {                                                                            \
+  TEST_CASE(case_name, tags) {                                                 \
     CUDA_KERNEL_NAME(kernel_name)<<<1, 1>>>();                                 \
     CUDA_CHECK_ERROR();                                                        \
   }                                                                            \

@@ -16,8 +16,7 @@ using namespace catz::cuda;
 using namespace catz::wmma;
 using namespace catz::mma;
 
-namespace catz::recipes
-{
+namespace catz::recipes {
 
 /////////////////////////////////////////////////////////////////////////////////
 /// version 1:
@@ -26,8 +25,7 @@ namespace catz::recipes
 /////////////////////////////////////////////////////////////////////////////////
 template <const int M_TILE, const int N_TILE, const int K_TILE>
 __global__ void _matmul_vanilla(int M, int N, int K, float alpha, float *lhs,
-                                float *rhs, float beta, float *out)
-{
+                                float *rhs, float beta, float *out) {
   int bid_x = blockIdx.x;
   int bid_y = blockIdx.y;
 
@@ -45,16 +43,16 @@ __global__ void _matmul_vanilla(int M, int N, int K, float alpha, float *lhs,
   out_shared[distribute_(tid_x, tid_y, 1, N_TILE)] = 0.0;
 
   for (int k = 0; k < CEIL_DIV(K, K_TILE); k++) { // range(0, 128, 1)
-    lhs_shared[distribute_(tid_x, tid_y, 1, K_TILE)]
-      = lhs[tiling_(bid_y, k, M_TILE, K_TILE, K, 1)
-            + distribute_(tid_x, tid_y, 1, K)];
+    lhs_shared[distribute_(tid_x, tid_y, 1, K_TILE)] =
+        lhs[tiling_(bid_y, k, M_TILE, K_TILE, K, 1) +
+            distribute_(tid_x, tid_y, 1, K)];
     // lhs_shared[distribute_(tid_x, tid_y, 1, K_TILE)] =
     //     __float2bfloat16(lhs[tiling_(bid_y, k, M_TILE, K_TILE, K, 1) +
     //                          distribute_(tid_x, tid_y, 1, K)]);
 
-    rhs_shared[distribute_(tid_x, tid_y, 1, N_TILE)]
-      = rhs[tiling_(k, bid_x, K_TILE, N_TILE, N, 1)
-            + distribute_(tid_x, tid_y, 1, N)];
+    rhs_shared[distribute_(tid_x, tid_y, 1, N_TILE)] =
+        rhs[tiling_(k, bid_x, K_TILE, N_TILE, N, 1) +
+            distribute_(tid_x, tid_y, 1, N)];
     // rhs_shared[distribute_(tid_x, tid_y, 1, N_TILE)] =
     //     __float2bfloat16(rhs[tiling_(k, bid_x, K_TILE, N_TILE, N, 1) +
     //                          distribute_(tid_x, tid_y, 1, N)]);
@@ -65,23 +63,22 @@ __global__ void _matmul_vanilla(int M, int N, int K, float alpha, float *lhs,
     // matmul_kernel_m16n16k16(lhs_shared, rhs_shared, out_shared);
     __syncthreads();
   }
-  out[tiling_(bid_y, bid_x, M_TILE, N_TILE, N, 1)
-      + distribute_(tid_x, tid_y, 1, N)]
-    = out_shared[distribute_(tid_x, tid_y, 1, N_TILE)];
+  out[tiling_(bid_y, bid_x, M_TILE, N_TILE, N, 1) +
+      distribute_(tid_x, tid_y, 1, N)] =
+      out_shared[distribute_(tid_x, tid_y, 1, N_TILE)];
   // out[tiling_(bid_y, bid_x, M_TILE, N_TILE, N, 1) + distribute_(tid_x, tid_y,
   // 1, N)] = alpha * partial_sum;
 }
 
 void matmul_f16f32(int M, int N, int K, float alpha, float *A, float *B,
-                   float beta, float *C)
-{
+                   float beta, float *C) {
   dim3 gridDim(CEIL_DIV(M, 16), CEIL_DIV(N, 16));
   dim3 blockDim(16, 16);
   cudaFuncSetAttribute(_matmul_vanilla<16, 16, 16>,
                        cudaFuncAttributePreferredSharedMemoryCarveout,
                        cudaSharedmemCarveoutMaxShared);
   _matmul_vanilla<16, 16, 16>
-    <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
+      <<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C);
 }
 
 } // namespace catz::recipes

@@ -12,23 +12,21 @@
 
 using namespace catz;
 
-namespace catz::wmma
-{
+namespace catz::wmma {
 
 // C += A * B
 // m16.n16.k16
 // f16.f16.f32
 // row-major, col-major, row-major
 inline __device__ void matmul_kernel_m16n16k16(half *a_half, half *b_half,
-                                               float *c)
-{
+                                               float *c) {
   // Declare the fragments
   nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, 16, 16, 16, half,
                          nvcuda::wmma::row_major>
-    A_frag;
+      A_frag;
   nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, 16, 16, 16, half,
                          nvcuda::wmma::row_major>
-    B_frag;
+      B_frag;
   nvcuda::wmma::fragment<nvcuda::wmma::accumulator, 16, 16, 16, float> C_frag;
 
   // nvcuda::wmma::fill_fragment(C_frag, 0.0f);
@@ -50,15 +48,15 @@ inline __device__ void matmul_kernel_m16n16k16(half *a_half, half *b_half,
 }
 
 inline __device__ void matmul_kernel_m16n16k16(__nv_bfloat16 *a_half,
-                                               __nv_bfloat16 *b_half, float *c)
-{
+                                               __nv_bfloat16 *b_half,
+                                               float *c) {
   // Declare the fragments
   nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, 16, 16, 16, __nv_bfloat16,
                          nvcuda::wmma::row_major>
-    A_frag;
+      A_frag;
   nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, 16, 16, 16, __nv_bfloat16,
                          nvcuda::wmma::row_major>
-    B_frag;
+      B_frag;
   nvcuda::wmma::fragment<nvcuda::wmma::accumulator, 16, 16, 16, float> C_frag;
 
   // nvcuda::wmma::fill_fragment(C_frag, 0.0f);
