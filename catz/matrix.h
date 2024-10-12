@@ -55,37 +55,101 @@ inline __device__ int tiling_(int tile_id_x, int tile_id_y, int to_stride_x,
 }
 
 // template<int X, int Y>
-struct Coord {
+struct CoordDyn {
   int first;
   int second;
 
   // 构造函数
-  constexpr __device__ Coord(int first, int second)
+  constexpr __device__ CoordDyn(int first, int second)
       : first(first), second(second) {}
 
   // 从 std::tuple<int, int> 构造
-  constexpr __device__ Coord(const std::tuple<int, int> &t)
+  constexpr __device__ CoordDyn(const std::tuple<int, int> &t)
       : first(std::get<0>(t)), second(std::get<1>(t)) {}
 
-  // 将 Coord 转换为 std::tuple<int, int>
+  // 将 CoordDyn 转换为 std::tuple<int, int>
   constexpr __device__ std::tuple<int, int> to_tuple() const {
     return std::make_tuple(first, second);
   }
 
-  constexpr Coord operator+(const Coord &other) const {
-    return Coord(first + other.first, second + other.second);
+  constexpr CoordDyn operator+(const CoordDyn &other) const {
+    return CoordDyn(first + other.first, second + other.second);
   }
 
-  constexpr Coord operator-(const Coord &other) const {
-    return Coord(first - other.first, second - other.second);
+  constexpr CoordDyn operator-(const CoordDyn &other) const {
+    return CoordDyn(first - other.first, second - other.second);
   }
 
-  constexpr Coord operator*(const Coord &other) const {
-    return Coord(first * other.first, second * other.second);
+  constexpr CoordDyn operator*(const CoordDyn &other) const {
+    return CoordDyn(first * other.first, second * other.second);
   }
 
-  constexpr Coord operator/(const Coord &other) const {
-    return Coord(first / other.first, second / other.second);
+  constexpr CoordDyn operator/(const CoordDyn &other) const {
+    return CoordDyn(first / other.first, second / other.second);
+  }
+
+  constexpr __device__ CoordDyn &xor_swizzle() {
+    auto i16 = (first * 32 + second) * sizeof(float) / 16;
+    auto y16 = i16 / 8;
+    auto x16 = i16 % 8;
+    auto x16_swz = y16 ^ x16;
+    auto x_swz =
+        x16_swz * 16 / sizeof(float) % 32 + second % (16 / sizeof(float));
+    second = x_swz % 32;
+    first = x_swz / 32;
+    return *this;
+  }
+
+  constexpr __device__ CoordDyn &xor_swizzle_col() {
+    auto i = (first * 16 + second);
+    auto i_swz = (first * 16 + second) ^ first;
+    second = i_swz % 16;
+    first = i_swz / 16;
+    return *this;
+  }
+
+  constexpr __device__ CoordDyn &xor_swizzle_row() {
+    auto i = (first * 16 + second);
+    auto i_swz = (first * 16 + second) ^ second;
+    second = i_swz % 16;
+    first = i_swz / 16;
+    return *this;
+  }
+};
+
+template <int ROWS, int COLS>
+struct Coord {
+  static_assert(ROWS != 0, "first dim cannot be zero.");
+  static_assert(COLS != 0, "second dim cannot be zero.");
+  static constexpr int first = ROWS;
+  static constexpr int second = COLS;
+
+  // 构造函数
+  constexpr __device__ Coord() {}
+
+  template <int ofirst, int osecond>
+  constexpr Coord<first + ofirst, second + osecond>
+  operator+(const Coord<ofirst, osecond> &other) const {
+    return Coord<first + other.first, second + other.second>();
+  }
+
+  template <int ofirst, int osecond>
+  constexpr Coord<first - ofirst, second - osecond>
+  operator-(const Coord<ofirst, osecond> &other) const {
+    return Coord<first - other.first, second - other.second>();
+  }
+
+  template <int ofirst, int osecond>
+  constexpr Coord<first * ofirst, second * osecond>
+  operator*(const Coord<ofirst, osecond> &other) const {
+    return Coord<first * other.first, second * other.second>();
+  }
+
+  template <int ofirst, int osecond>
+  constexpr Coord<first / ofirst, second / osecond>
+  operator/(const Coord<ofirst, osecond> &other) const {
+    static_assert(second != 0 && other.second != 0, "Division by zero");
+    return Coord<first / other.first, second / other.second>();
   }
 
   constexpr __device__ Coord &xor_swizzle() {
@@ -101,102 +165,41 @@ struct Coord {
   }
 
   constexpr __device__ Coord &xor_swizzle_col() {
-    auto i = (first * 16 + second);
-    auto i_swz = (first * 16 + second) ^ first;
-    second = i_swz % 16;
-    first = i_swz / 16;
-    return *this;
-  }
-
-  constexpr __device__ Coord &xor_swizzle_row() {
-    auto i = (first * 16 + second);
-    auto i_swz = (first * 16 + second) ^ second;
-    second = i_swz % 16;
-    first = i_swz / 16;
-    return *this;
-  }
-};
-
-template <int ROWS, int COLS>
-struct CoordNightly {
-  static_assert(ROWS != 0, "first dim cannot be zero.");
-  static_assert(COLS != 0, "second dim cannot be zero.");
-  static constexpr int first = ROWS;
-  static constexpr int second = COLS;
-
-  // 构造函数
-  constexpr __device__ CoordNightly() {}
-
-  template <int ofirst, int osecond>
-  constexpr CoordNightly<first + ofirst, second + osecond>
-  operator+(const CoordNightly<ofirst, osecond> &other) const {
-    return CoordNightly<first + other.first, second + other.second>();
-  }
-
-  template <int ofirst, int osecond>
-  constexpr CoordNightly<first - ofirst, second - osecond>
-  operator-(const CoordNightly<ofirst, osecond> &other) const {
-    return CoordNightly<first - other.first, second - other.second>();
-  }
-
-  template <int ofirst, int osecond>
-  constexpr CoordNightly<first * ofirst, second * osecond>
-  operator*(const CoordNightly<ofirst, osecond> &other) const {
-    return CoordNightly<first * other.first, second * other.second>();
-  }
-
-  template <int ofirst, int osecond>
-  constexpr CoordNightly<first / ofirst, second / osecond>
-  operator/(const CoordNightly<ofirst, osecond> &other) const {
-    static_assert(second != 0 && other.second != 0, "Division by zero");
-    return CoordNightly<first / other.first, second / other.second>();
-  }
-
-  constexpr __device__ CoordNightly &xor_swizzle() {
-    auto i16 = (first * 32 + second) * sizeof(float) / 16;
-    auto y16 = i16 / 8;
-    auto x16 = i16 % 8;
-    auto x16_swz = y16 ^ x16;
-    auto x_swz =
-        x16_swz * 16 / sizeof(float) % 32 + second % (16 / sizeof(float));
-    second = x_swz % 32;
-    first = x_swz / 32;
-    return *this;
-  }
-
-  constexpr __device__ CoordNightly &xor_swizzle_col() {
     constexpr auto i = (first * 16 + second);
     constexpr auto i_swz = i ^ first;
     // auto _second = i_swz % 16;
     // auto _first = i_swz / 16;
     // return *this;
-    return CoordNightly<(i_swz / 16), (i_swz % 16)>();
+    return Coord<(i_swz / 16), (i_swz % 16)>();
   }
 
-  constexpr __device__ CoordNightly &xor_swizzle_row() {
+  constexpr __device__ Coord &xor_swizzle_row() {
     constexpr auto i = (first * 16 + second);
     constexpr auto i_swz = i ^ second;
     // second = i_swz % 16;
     // first = i_swz / 16;
     // return *this;
-    return CoordNightly<(i_swz / 16), (i_swz % 16)>();
+    return Coord<(i_swz / 16), (i_swz % 16)>();
   }
 };
+
+#define make_coord(rows, cols) Coord<rows, cols>()
+// #define Coord(rows, cols) Coord<rows, cols>()
 
 template <typename T, typename CoordType, typename CoordType2>
 struct MatrixNightly;
 
 template <typename T, int ROWS, int COLS, int STRD>
-struct MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<STRD, 1>> {
+struct MatrixNightly<T, Coord<ROWS, COLS>, Coord<STRD, 1>> {
   static_assert(is_allowed_type<T>::value,
                 "T must be one of the allowed types: float, half, or float4.");
   T *data;
-  CoordNightly<ROWS, COLS> shape;
-  CoordNightly<STRD, 1> stride;
+  Coord<ROWS, COLS> shape;
+  Coord<STRD, 1> stride;
 
-  // the complete construction function
-  constexpr __device__ MatrixNightly(T *data, CoordNightly<ROWS, COLS> shape,
-                                     CoordNightly<STRD, 1> stride)
+  // constructor
+  constexpr __device__ MatrixNightly(T *data, Coord<ROWS, COLS> shape,
+                                     Coord<STRD, 1> stride)
       : data(data), shape(shape), stride(stride) {}
 
   // copy
@@ -209,35 +212,23 @@ struct MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<STRD, 1>> {
     other.data = nullptr;
   }
 
-  inline __device__ MatrixNightly next() {
-    data += 1;
-    return *this;
-  }
-
-  inline __device__ void fill(T value) {
-    int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
-    int row_in_current = flat_id / shape.second;
-    int col_in_current = flat_id % shape.second;
-    int elements = shape.first * shape.second;
-    int threads = blockDim.x * blockDim.y;
-    for (int chunk = 0; chunk < CEIL_DIV(elements, threads); chunk++) {
-      data[chunk * threads + flat_id] = value;
-    }
-  }
+  ///////////////////////////////////////////////////////////
+  /// dataflow related methods
+  ///////////////////////////////////////////////////////////
 
   // TODO: make it device'd code
   template <int NROWS, int NCOLS>
   constexpr inline __device__
-      MatrixNightly<T, CoordNightly<NROWS, NCOLS>, CoordNightly<STRD, 1>>
-      tile(Coord tile_var, CoordNightly<NROWS, NCOLS> new_shape) {
+      MatrixNightly<T, Coord<NROWS, NCOLS>, Coord<STRD, 1>>
+      tile(CoordDyn tile_var, Coord<NROWS, NCOLS> new_shape) {
     T *new_data = data + tile_var.first * new_shape.first * stride.first +
                   tile_var.second * new_shape.second * stride.second;
-    MatrixNightly<T, CoordNightly<NROWS, NCOLS>, CoordNightly<STRD, 1>> ret =
+    MatrixNightly<T, Coord<NROWS, NCOLS>, Coord<STRD, 1>> ret =
         make_matrix(new_data, new_shape, stride);
     return std::move(ret);
   }
 
-  constexpr inline __device__ MatrixNightly dist_to(Coord tile_var) {
+  constexpr inline __device__ MatrixNightly dist_to(CoordDyn tile_var) {
     // shape = 8 x 2
     // y in 0-4, x in 0-4
     MatrixNightly ret = MatrixNightly(data + tile_var.first * stride.first +
@@ -254,6 +245,111 @@ struct MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<STRD, 1>> {
                                       shape, stride);
     return std::move(ret);
   }
+
+  // distribute the following NUM_THREADS elements to all threads
+  constexpr inline __device__ MatrixNightly dist_to_thread() {
+    // NOTE: we can have three design
+    // 1. use all threads to spread
+    // 2. use x threads to spread
+    // 3. use a wrap to spread.
+    // we prefer to take third option in currently design
+    int lane_id = threadIdx.y * blockDim.x + threadIdx.x;
+    int row_in_current = lane_id / shape.second;
+    int col_in_current = lane_id % shape.second;
+    MatrixNightly ret = MatrixNightly(data + row_in_current * stride.first +
+                                          col_in_current * stride.second,
+                                      shape, stride);
+    return std::move(ret);
+  }
+
+  // very specialised API, only consider using this for wrap-level
+  // distribute the following 32 elements to a wrap
+  constexpr inline __device__ MatrixNightly dist_to_wrap() {
+    // NOTE: we can have three design
+    // 1. use all threads to spread
+    // 2. use x threads to spread
+    // 3. use a wrap to spread.
+    // we prefer to take third option in currently design
+    int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
+    int row_in_current = lane_id / shape.second;
+    int col_in_current = lane_id % shape.second;
+    MatrixNightly ret = MatrixNightly(data + row_in_current * stride.first +
+                                          col_in_current * stride.second,
+                                      shape, stride);
+    return std::move(ret);
+  }
+
+  ///////////////////////////////////////////////////////////
+  /// tensor-core related methods
+  ///////////////////////////////////////////////////////////
+
+  template <typename U = T>
+  inline __device__
+      typename std::enable_if<std::is_same<U, half>::value, void>::type
+      load_fragments(unsigned *loader) {
+    // TODO: add loader length check
+    int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
+    int lane_rank = lane_id % shape.first;
+    int lane_group = lane_id / shape.first;
+    const half *data_ptr = data + lane_rank * stride.first + lane_group * 8;
+    if (shape.first == 16 && shape.second == 8) {
+      // LHS X2
+      asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
+                   : "=r"(loader[0]), "=r"(loader[1])
+                   : "r"(get_smem_ptr(data_ptr)));
+    } else if (shape.first == 16 && shape.second == 16) {
+      // RHS X1
+      asm volatile(
+          "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
+          : "=r"(loader[0]), "=r"(loader[1]), "=r"(loader[2]), "=r"(loader[3])
+          : "r"(get_smem_ptr(data_ptr)));
+    } else if (shape.first == 8 && shape.second == 8) {
+      // LHS X4
+      asm volatile("ldmatrix.sync.aligned.m8n8.x1.trans.shared.b16 {%0}, [%1];"
+                   : "=r"(loader[0])
+                   : "r"(get_smem_ptr(data_ptr)));
+    } else if (shape.first == 8 && shape.second == 16) {
+      // RHS X2
+      asm volatile(
+          "ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 {%0, %1}, [%2];"
+          : "=r"(loader[0]), "=r"(loader[1])
+          : "r"(get_smem_ptr(data_ptr)));
+    }
+  }
+
+  template <typename U = T>
+  constexpr inline __device__
+      typename std::enable_if<std::is_same<U, float>::value, void>::type
+      load_fragments_c(float *loader) {
+    int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
+    if (shape.first == 16 && shape.second == 8) {
+      loader[0] = data[(lane_id / 4) * stride.first + (lane_id % 4) * 2];
+      loader[1] = data[(lane_id / 4) * stride.first + (lane_id % 4) * 2 + 1];
+      loader[2] = data[(lane_id / 4) * stride.first + (lane_id % 4) * 2 +
+                       8 * stride.first];
+      loader[3] = data[(lane_id / 4) * stride.first + (lane_id % 4) * 2 +
+                       8 * stride.first + 1];
+    }
+  }
+
+  template <typename U = T>
+  constexpr inline __device__
+      typename std::enable_if<std::is_same<U, float>::value, void>::type
+      store_fragments_c(float *storer) {
+    int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
+    if (shape.first == 16 && shape.second == 8) {
+      data[(lane_id / 4) * stride.first + (lane_id % 4) * 2] = storer[0];
+      data[(lane_id / 4) * stride.first + (lane_id % 4) * 2 + 1] = storer[1];
+      data[(lane_id / 4) * stride.first + (lane_id % 4) * 2 +
+           8 * stride.first] = storer[2];
+      data[(lane_id / 4) * stride.first + (lane_id % 4) * 2 + 8 * stride.first +
+           1] = storer[3];
+    }
+  }
+
+  ///////////////////////////////////////////////////////////
+  /// operators
+  ///////////////////////////////////////////////////////////
 
   constexpr __device__ void operator=(const MatrixNightly &other) {
     *data = *other.data;
@@ -287,6 +383,202 @@ struct MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<STRD, 1>> {
     *data = __float2half(other_scalar);
   }
 
+  // operator '<=' is syntax sugar that combines dist-to-threads and '='
+  // operator
+  constexpr inline __device__ void operator<=(const MatrixNightly &other) {
+    // can make 11352
+    int total_threads = blockDim.x * blockDim.y;
+    // int total_threads = 256;
+    int total_elements = shape.first * shape.second;
+    // int total_elements = 128 * 32;
+    int thread_id = threadIdx.y * blockDim.x + threadIdx.x;
+
+    int row_this = thread_id / shape.second;
+    int col_this = thread_id % shape.second;
+    int row_other = thread_id / other.shape.second;
+    int col_other = thread_id % other.shape.second;
+
+    // TODO: make this config more general
+    // #pragma unroll 8
+    // NOTE: we need constexpr for avoiding heavy runtime index calc
+    // compile-time symbolic index calc, become perf drop
+    // for (int i = 0; i < total_elements / total_threads; i++)
+    //   (data)[i * total_threads * 32 / 32
+    //          + row_this * 32 + col_this]
+    //     = ((other.data))[i * total_threads *4096
+    //                        /32
+    //                      + row_other * 4096 + col_other];
+#pragma unroll 16
+    for (int i = 0; i < 16 /* total_elements / total_threads */; i++)
+      (data)[i * total_threads * stride.first / shape.second +
+             row_this * stride.first + col_this] =
+          ((other.data))[i * total_threads * other.stride.first /
+                             other.shape.second +
+                         row_other * other.stride.first + col_other];
+    // if (total_threads * 4 < total_elements) {
+    //   total_elements = total_elements / 4;
+    //   int row_this = thread_id / (shape.second / 4);
+    //   int col_this = thread_id % (shape.second / 4);
+    //   int row_other = thread_id / (other.shape.second / 4);
+    //   int col_other = thread_id % (other.shape.second / 4);
+    //   for (int i = 0; i < total_elements; i += total_threads)
+    //     ((float4*)data)[i * stride.first / shape.second + row_this *
+    //     stride.first + col_this]
+    //       = ((float4*)(other.data))[i * other.stride.first /
+    //       other.shape.second
+    //                    + row_other * other.stride.first / 4 + col_other];
+    // } else {
+    //   int row_this = thread_id / shape.second;
+    //   int col_this = thread_id % shape.second;
+    //   int row_other = thread_id / other.shape.second;
+    //   int col_other = thread_id % other.shape.second;
+    //   for (int i = 0; i < total_elements; i += total_threads)
+    //     (data)[i * stride.first / shape.second + row_this * stride.first +
+    //     col_this]
+    //       = ((other.data))[i * other.stride.first / other.shape.second
+    //                    + row_other * other.stride.first + col_other];
+    // }
+  }
+
+  //   for (int m = 0; m < 8/* CEIL_DIV(M_TILE, 2) */; m++) {
+  //     lhs_shared_mat.tile(Coord(m, kin), Coord(2, 16)).dist_to_thread()
+  //       = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
+  //           .tile(Coord(m, kin), Coord(2, 16))
+  //           .dist_to_thread();
+  //   }
+  template <typename U = T, typename CoordType, typename CoordType2>
+  constexpr inline __device__
+      typename std::enable_if<std::is_same<U, half>::value, void>::type
+      operator<=(const MatrixNightly<float, CoordType, CoordType2> &other) {
+    int total_threads = blockDim.x * blockDim.y;
+    int total_elements = shape.first * shape.second;
+    int thread_id = threadIdx.x + threadIdx.y * blockDim.x;
+    int row_this = thread_id / shape.second;
+    int col_this = thread_id % shape.second;
+    int row_other = thread_id / other.shape.second;
+    int col_other = thread_id % other.shape.second;
+
+    // OPTION I: normalised loop, with full symbolic index calculation
+    // ~ 4180 GFLOPS
+#pragma unroll 8
+    for (int i = 0; i < total_elements / total_threads; i++)
+      (data)[i * total_threads * stride.first / shape.second +
+             row_this * stride.first + col_this] =
+          ((other.data))[i * total_threads * other.stride.first /
+                             other.shape.second +
+                         row_other * other.stride.first + col_other];
+
+    // OPTION II: non-normalised loop, with full symbolic index calculation
+    // ~ 1940 GFLOPS
+    // for (int i = 0; i < total_elements; i+=total_threads)
+    //   (data)[i * stride.first / shape.second + row_this * stride.first +
+    //   col_this]
+    //     = ((other.data))[i * other.stride.first / other.shape.second
+    //                      + row_other * other.stride.first + col_other];
+
+    // OPTION II: non-normalised loop, with full symbolic index calculation
+    // ~ 2800 GFLOPS
+    // for (int i = 0; i < total_elements; i+=32)
+    //   (data)[i * stride.first / shape.second + row_this * stride.first +
+    //   col_this]
+    //     = ((other.data))[i * other.stride.first / other.shape.second
+    //                      + row_other * other.stride.first + col_other];
+
+    // OPTION II: non-normalised loop, with more-of-literal calculation
+    // ~ 2790 GFLOPS
+    //
+    // for (int i = 0; i < 256; i+=32)
+    //   (data)[i * 16 / shape.second + row_this * 16 + col_this]
+    //     = ((other.data))[i * 4096 / other.shape.second
+    //                      + row_other * 4096 + col_other];
+
+    // if (total_threads * 4 < total_elements) {
+    //   total_elements = total_elements / 4;
+    //   for (int i = 0; i < total_elements; i += total_threads)
+    //     ((float4*)data)[i * stride.first / shape.second + row_this *
+    //     stride.first + col_this]
+    //       = ((float4*)(other.data))[i * other.stride.first /
+    //       other.shape.second
+    //                    + row_other * other.stride.first + col_other];
+    // } else {
+    //   for (int i = 0; i < total_elements; i += total_threads)
+    //     (data)[i * stride.first / shape.second + row_this * stride.first +
+    //     col_this]
+    //       = ((other.data))[i * other.stride.first / other.shape.second
+    //                    + row_other * other.stride.first + col_other];
+    // }
+  }
+
+  // TODO: merge it
+  // use threads in one wrap to move it,
+  // replace m with threadIdx.y
+  //
+  // for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
+  //   out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
+  //       .tile(Coord(m, n), out_reg_tile_shape)
+  //     <<= out_shared_mat.tile(Coord(m, n), out_reg_tile_shape);
+  // }
+  // special operator that allows any same-volume copy, when the volume is
+  // dividable by threads volume
+  constexpr inline __device__ void operator<<=(const MatrixNightly &other) {
+    int total_threads = blockDim.x;
+    // int total_threads = blockDim.x * blockDim.y;
+    int total_elements = shape.first * shape.second;
+    int thread_id = (threadIdx.x + threadIdx.y * blockDim.x) % 32;
+    // int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
+    int row_this = thread_id / shape.second;
+    int col_this = thread_id % shape.second;
+    int row_other = thread_id / other.shape.second;
+    int col_other = thread_id % other.shape.second;
+    // #pragma unroll
+    for (int i = 0; i < total_elements; i += total_threads) {
+      data[i * stride.first / shape.second + row_this * stride.first +
+           col_this] = other.data[i * other.stride.first / other.shape.second +
+                                  row_other * other.stride.first + col_other];
+    }
+  }
+
+  template <typename U = T, typename CoordType, typename CoordType2>
+  constexpr inline __device__
+      typename std::enable_if<std::is_same<U, half>::value, void>::type
+      operator<<=(const MatrixNightly<float, CoordType, CoordType2> &other) {
+    int total_threads = blockDim.x;
+    // int total_threads = blockDim.x * blockDim.y;
+    int total_elements = shape.first * shape.second;
+    int thread_id = (threadIdx.x + threadIdx.y * blockDim.x) % 32;
+    int row_this = thread_id / shape.second;
+    int col_this = thread_id % shape.second;
+    int row_other = thread_id / other.shape.second;
+    int col_other = thread_id % other.shape.second;
+    // #pragma unroll
+    for (int i = 0; i < total_elements; i += total_threads) {
+      data[i * stride.first / shape.second + row_this * stride.first +
+           col_this] =
+          __float2half(other.data[i * other.stride.first / other.shape.second +
+                                  row_other * other.stride.first + col_other]);
+    }
+  }
+
+  ///////////////////////////////////////////////////////////
+  /// utils methods
+  ///////////////////////////////////////////////////////////
+
+  inline __device__ MatrixNightly next() {
+    data += 1;
+    return *this;
+  }
+
+  inline __device__ void fill(T value) {
+    int flat_id = threadIdx.y * blockDim.x + threadIdx.x;
+    int row_in_current = flat_id / shape.second;
+    int col_in_current = flat_id % shape.second;
+    int elements = shape.first * shape.second;
+    int threads = blockDim.x * blockDim.y;
+    for (int chunk = 0; chunk < CEIL_DIV(elements, threads); chunk++) {
+      data[chunk * threads + flat_id] = value;
+    }
+  }
+
   template <typename U = T>
   constexpr inline __device__
       typename std::enable_if<std::is_same<U, float>::value, void>::type
@@ -313,39 +605,39 @@ make_matrix(T *data, CoordType shape, CoordType2 stride) {
 // Specialised builder for contiguous memory
 // (T*, CoordType) -> Matrix
 template <typename T, int ROWS, int COLS>
-__device__ MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<COLS, 1>>
-make_matrix(T *data, CoordNightly<ROWS, COLS> shape) {
-  return MatrixNightly<T, CoordNightly<ROWS, COLS>, CoordNightly<COLS, 1>>(
-      data, shape, CoordNightly<COLS, 1>());
+__device__ MatrixNightly<T, Coord<ROWS, COLS>, Coord<COLS, 1>>
+make_matrix(T *data, Coord<ROWS, COLS> shape) {
+  return MatrixNightly<T, Coord<ROWS, COLS>, Coord<COLS, 1>>(data, shape,
+                                                             Coord<COLS, 1>());
 }
 
 template <typename T>
-struct Matrix {
+struct MatrixDyn {
   static_assert(is_allowed_type<T>::value,
                 "T must be one of the allowed types: float, half, or float4.");
 
   // A, 16x32, 32x4
   T *data;
-  Coord shape;
-  Coord stride;
+  CoordDyn shape;
+  CoordDyn stride;
 
-  constexpr __device__ Matrix(T *data, Coord shape)
-      : data(data), shape(shape), stride(Coord(shape.second, 1)) {}
+  constexpr __device__ MatrixDyn(T *data, CoordDyn shape)
+      : data(data), shape(shape), stride(CoordDyn(shape.second, 1)) {}
 
-  constexpr __device__ Matrix(T *data, Coord shape, Coord stride)
+  constexpr __device__ MatrixDyn(T *data, CoordDyn shape, CoordDyn stride)
       : data(data), shape(shape), stride(stride) {}
 
   // copy
-  constexpr __device__ Matrix(const Matrix &other)
+  constexpr __device__ MatrixDyn(const MatrixDyn &other)
       : data(other.data), shape(other.shape), stride(other.stride) {}
 
   // move
-  constexpr __device__ Matrix(Matrix &&other) noexcept
+  constexpr __device__ MatrixDyn(MatrixDyn &&other) noexcept
       : data(other.data), shape(other.shape), stride(other.stride) {
     other.data = nullptr;
   }
 
-  __device__ Matrix next() {
+  __device__ MatrixDyn next() {
     data += 1;
     return *this;
   }
@@ -426,34 +718,35 @@ struct Matrix {
     }
   }
 
-  constexpr inline __device__ Matrix tile(Coord tile_var, Coord other_shape) {
-    Matrix ret =
-        Matrix(data + tile_var.first * other_shape.first * stride.first +
-                   tile_var.second * other_shape.second * stride.second,
-               other_shape, stride);
+  constexpr inline __device__ MatrixDyn tile(CoordDyn tile_var,
+                                             CoordDyn other_shape) {
+    MatrixDyn ret =
+        MatrixDyn(data + tile_var.first * other_shape.first * stride.first +
+                      tile_var.second * other_shape.second * stride.second,
+                  other_shape, stride);
     return std::move(ret);
   }
 
-  constexpr inline __device__ Matrix dist_to(Coord tile_var) {
+  constexpr inline __device__ MatrixDyn dist_to(CoordDyn tile_var) {
     // shape = 8 x 2
     // y in 0-4, x in 0-4
-    Matrix ret = Matrix(data + tile_var.first * stride.first +
-                            tile_var.second * stride.second,
-                        shape, stride);
+    MatrixDyn ret = MatrixDyn(data + tile_var.first * stride.first +
+                                  tile_var.second * stride.second,
+                              shape, stride);
     return std::move(ret);
   }
 
-  constexpr inline __device__ Matrix dist_to(int dist_id) {
+  constexpr inline __device__ MatrixDyn dist_to(int dist_id) {
     int row_in_current = dist_id / shape.second;
     int col_in_current = dist_id % shape.second;
-    Matrix ret = Matrix(data + row_in_current * stride.first +
-                            col_in_current * stride.second,
-                        shape, stride);
+    MatrixDyn ret = MatrixDyn(data + row_in_current * stride.first +
+                                  col_in_current * stride.second,
+                              shape, stride);
     return std::move(ret);
   }
 
   // distribute the following 32 elements to a wrap
-  constexpr inline __device__ Matrix dist_to_wrap() {
+  constexpr inline __device__ MatrixDyn dist_to_wrap() {
     // NOTE: we can have three design
     // 1. use all threads to spread
     // 2. use x threads to spread
@@ -462,14 +755,14 @@ struct Matrix {
     int lane_id = (threadIdx.y * blockDim.x + threadIdx.x) % 32;
     int row_in_current = lane_id / shape.second;
     int col_in_current = lane_id % shape.second;
-    Matrix ret = Matrix(data + row_in_current * stride.first +
-                            col_in_current * stride.second,
-                        shape, stride);
+    MatrixDyn ret = MatrixDyn(data + row_in_current * stride.first +
+                                  col_in_current * stride.second,
+                              shape, stride);
     return std::move(ret);
   }
 
   // distribute the following NUM_THREADS elements to all threads
-  constexpr inline __device__ Matrix dist_to_thread() {
+  constexpr inline __device__ MatrixDyn dist_to_thread() {
     // NOTE: we can have three design
     // 1. use all threads to spread
     // 2. use x threads to spread
@@ -478,15 +771,15 @@ struct Matrix {
     int lane_id = threadIdx.y * blockDim.x + threadIdx.x;
     int row_in_current = lane_id / shape.second;
     int col_in_current = lane_id % shape.second;
-    Matrix ret = Matrix(data + row_in_current * stride.first +
-                            col_in_current * stride.second,
-                        shape, stride);
+    MatrixDyn ret = MatrixDyn(data + row_in_current * stride.first +
+                                  col_in_current * stride.second,
+                              shape, stride);
     return std::move(ret);
   }
 
   // operator '<=' is syntax sugar that combines dist-to-threads and '='
   // operator
-  constexpr inline __device__ void operator<=(const Matrix &other) {
+  constexpr inline __device__ void operator<=(const MatrixDyn &other) {
     // can make 11352
     int total_threads = blockDim.x * blockDim.y;
     // int total_threads = 256;
@@ -542,15 +835,15 @@ struct Matrix {
   }
 
   //   for (int m = 0; m < 8/* CEIL_DIV(M_TILE, 2) */; m++) {
-  //     lhs_shared_mat.tile(Coord(m, kin), Coord(2, 16)).dist_to_thread()
-  //       = lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-  //           .tile(Coord(m, kin), Coord(2, 16))
+  //     lhs_shared_mat.tile(CoordDyn(m, kin), CoordDyn(2, 16)).dist_to_thread()
+  //       = lhs_mat.tile(CoordDyn(blockIdx.y, ko), lhs_sm_tile_shape)
+  //           .tile(CoordDyn(m, kin), CoordDyn(2, 16))
   //           .dist_to_thread();
   //   }
   template <typename U = T>
   constexpr inline __device__
       typename std::enable_if<std::is_same<U, half>::value, void>::type
-      operator<=(const Matrix<float> &other) {
+      operator<=(const MatrixDyn<float> &other) {
     int total_threads = blockDim.x * blockDim.y;
     int total_elements = shape.first * shape.second;
     int thread_id = threadIdx.x + threadIdx.y * blockDim.x;
@@ -615,13 +908,13 @@ struct Matrix {
   // replace m with threadIdx.y
   //
   // for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-  //   out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape)
-  //       .tile(Coord(m, n), out_reg_tile_shape)
-  //     <<= out_shared_mat.tile(Coord(m, n), out_reg_tile_shape);
+  //   out_mat.tile(CoordDyn(blockIdx.x, blockIdx.y), out_sm_tile_shape)
+  //       .tile(CoordDyn(m, n), out_reg_tile_shape)
+  //     <<= out_shared_mat.tile(CoordDyn(m, n), out_reg_tile_shape);
   // }
   // special operator that allows any same-volume copy, when the volume is
   // dividable by threads volume
-  constexpr inline __device__ void operator<<=(const Matrix &other) {
+  constexpr inline __device__ void operator<<=(const MatrixDyn &other) {
     int total_threads = blockDim.x;
     // int total_threads = blockDim.x * blockDim.y;
     int total_elements = shape.first * shape.second;
@@ -642,7 +935,7 @@ struct Matrix {
   template <typename U = T>
   constexpr inline __device__
       typename std::enable_if<std::is_same<U, half>::value, void>::type
-      operator<<=(const Matrix<float> &other) {
+      operator<<=(const MatrixDyn<float> &other) {
     int total_threads = blockDim.x;
     // int total_threads = blockDim.x * blockDim.y;
     int total_elements = shape.first * shape.second;
@@ -660,7 +953,7 @@ struct Matrix {
     }
   }
 
-  constexpr __device__ void operator=(const Matrix<T> &other) {
+  constexpr __device__ void operator=(const MatrixDyn<T> &other) {
     *data = *other.data;
   }
 
@@ -673,7 +966,7 @@ struct Matrix {
   template <typename U = T>
   constexpr inline __device__
       typename std::enable_if<std::is_same<U, half>::value, void>::type
-      operator=(const Matrix<float> &other) {
+      operator=(const MatrixDyn<float> &other) {
     *data = __float2half(*other.data);
   }
 
@@ -681,7 +974,7 @@ struct Matrix {
   template <typename U = T>
   constexpr inline __device__
       typename std::enable_if<std::is_same<U, float>::value, void>::type
-      operator=(const Matrix<half> &other) {
+      operator=(const MatrixDyn<half> &other) {
     *data = __half2float(*other.data);
   }
 
@@ -707,27 +1000,23 @@ struct Matrix {
 };
 
 // helper for shared decl
-// template<Coord shape>
 template <int x, int y, typename T>
-__device__ Matrix<T> make_shared() {
+__device__ MatrixDyn<T> make_shared() {
   static_assert(is_allowed_type<T>::value,
                 "T must be one of the allowed types: float, half, or float4.");
 
   __shared__ T _data[x * y];
-  return Matrix<T>(std::move(_data), Coord(x, y));
+  return MatrixDyn<T>(std::move(_data), CoordDyn(x, y));
 }
 
 template <int x, int y, typename T>
-__device__ Matrix<T> make_local() {
+__device__ MatrixDyn<T> make_local() {
   static_assert(is_allowed_type<T>::value,
                 "T must be one of the allowed types: float, half, or float4.");
   float _data[x * y] = {0.};
   // extern __shared__ float _data[];
-  return Matrix<T>(_data, Coord(x, y));
+  return MatrixDyn<T>(_data, CoordDyn(x, y));
 }
-
-// TODO: consider use std::integral_constant to make Coord known at compile-time
-__device__ Coord &&make_coord(int x, int y) { return std::move(Coord(x, y)); }
 
 __device__ __forceinline__ int xor_swizzle(int o) {
   return (o ^ ((o & (7 << 5)) >> 3));

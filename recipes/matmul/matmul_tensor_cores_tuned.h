@@ -24,23 +24,23 @@ __global__ void
 _matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(int M, int N, int K, float alpha,
                                               float *lhs, float *rhs,
                                               float beta, float *out) {
-  auto lhs_shape = make_coord(M, K);
-  auto rhs_shape = make_coord(K, N);
-  auto out_shape = make_coord(M, N);
+  auto lhs_shape = CoordDyn(M, K);
+  auto rhs_shape = CoordDyn(K, N);
+  auto out_shape = CoordDyn(M, N);
 
-  auto lhs_sm_tile_shape = Coord(M_TILE, K_TILE);
-  auto rhs_sm_tile_shape = Coord(K_TILE, N_TILE);
-  auto out_sm_tile_shape = Coord(M_TILE, N_TILE);
+  auto lhs_sm_tile_shape = CoordDyn(M_TILE, K_TILE);
+  auto rhs_sm_tile_shape = CoordDyn(K_TILE, N_TILE);
+  auto out_sm_tile_shape = CoordDyn(M_TILE, N_TILE);
 
-  auto lhs_reg_tile_shape = Coord(M_REG, K_REG);
-  auto rhs_reg_tile_shape = Coord(K_REG, N_REG);
-  auto out_reg_tile_shape = Coord(M_REG, N_REG);
+  auto lhs_reg_tile_shape = CoordDyn(M_REG, K_REG);
+  auto rhs_reg_tile_shape = CoordDyn(K_REG, N_REG);
+  auto out_reg_tile_shape = CoordDyn(M_REG, N_REG);
 
   // make sure inner block looks like this, to ensure coalescing
 
-  Matrix<float> lhs_mat = Matrix<float>(lhs, lhs_shape);
-  Matrix<float> rhs_mat = Matrix<float>(rhs, rhs_shape);
-  Matrix<float> out_mat = Matrix<float>(out, out_shape);
+  MatrixDyn<float> lhs_mat = MatrixDyn<float>(lhs, lhs_shape);
+  MatrixDyn<float> rhs_mat = MatrixDyn<float>(rhs, rhs_shape);
+  MatrixDyn<float> out_mat = MatrixDyn<float>(out, out_shape);
 
   MAKE_SHARED(lhs_shared_mat, M_TILE, K_TILE, half);
   MAKE_SHARED(rhs_shared_mat, K_TILE, N_TILE, half);
@@ -50,26 +50,29 @@ _matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(int M, int N, int K, float alpha,
 
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
     for (int kin = 0; kin < CEIL_DIV(K_TILE, K_REG); kin++) {
-      lhs_shared_mat.tile(Coord(0, kin), Coord(M_TILE, K_REG)) <=
-          lhs_mat.tile(Coord(blockIdx.x, ko), lhs_sm_tile_shape)
-              .tile(Coord(0, kin), Coord(M_TILE, K_REG));
-      rhs_shared_mat.tile(Coord(kin, 0), Coord(K_REG, N_TILE)) <=
-          rhs_mat.tile(Coord(ko, blockIdx.y), rhs_sm_tile_shape)
-              .tile(Coord(kin, 0), Coord(K_REG, N_TILE));
+      lhs_shared_mat.tile(CoordDyn(0, kin), CoordDyn(M_TILE, K_REG)) <=
+          lhs_mat.tile(CoordDyn(blockIdx.x, ko), lhs_sm_tile_shape)
+              .tile(CoordDyn(0, kin), CoordDyn(M_TILE, K_REG));
+      rhs_shared_mat.tile(CoordDyn(kin, 0), CoordDyn(K_REG, N_TILE)) <=
+          rhs_mat.tile(CoordDyn(ko, blockIdx.y), rhs_sm_tile_shape)
+              .tile(CoordDyn(kin, 0), CoordDyn(K_REG, N_TILE));
       __syncthreads();
 
       for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
         mma_m16n8k8_f16f32_neo(
-            out_shared_mat.tile(Coord(threadIdx.y, n), Coord(M_REG, N_REG)),
-            lhs_shared_mat.tile(Coord(threadIdx.y, kin), Coord(M_REG, K_REG)),
-            rhs_shared_mat.tile(Coord(kin, n), Coord(K_REG, N_REG)),
-            out_shared_mat.tile(Coord(threadIdx.y, n), Coord(M_REG, N_REG)));
+            out_shared_mat.tile(CoordDyn(threadIdx.y, n),
+                                CoordDyn(M_REG, N_REG)),
+            lhs_shared_mat.tile(CoordDyn(threadIdx.y, kin),
+                                CoordDyn(M_REG, K_REG)),
+            rhs_shared_mat.tile(CoordDyn(kin, n), CoordDyn(K_REG, N_REG)),
+            out_shared_mat.tile(CoordDyn(threadIdx.y, n),
+                                CoordDyn(M_REG, N_REG)));
       }
     }
   }
   __syncthreads();
 
-  out_mat.tile(Coord(blockIdx.x, blockIdx.y), out_sm_tile_shape) <=
+  out_mat.tile(CoordDyn(blockIdx.x, blockIdx.y), out_sm_tile_shape) <=
       out_shared_mat;
 }
 
@@ -106,36 +109,37 @@ template <const int M_TILE, const int N_TILE, const int K_TILE,
 __global__ void _matmul_tuned_with_mma_kernel(int M, int N, int K, float alpha,
                                               float *lhs, float *rhs,
                                               float beta, float *out) {
-  auto lhs_shape = make_coord(M, K);
-  auto rhs_shape = make_coord(K, N);
-  auto out_shape = make_coord(M, N);
+  auto lhs_shape = CoordDyn(M, K);
+  auto rhs_shape = CoordDyn(K, N);
+  auto out_shape = CoordDyn(M, N);
 
-  auto lhs_sm_tile_shape = Coord(M_TILE, K_TILE);
-  auto rhs_sm_tile_shape = Coord(K_TILE, N_TILE);
-  auto out_sm_tile_shape = Coord(M_TILE, N_TILE);
+  auto lhs_sm_tile_shape = CoordDyn(M_TILE, K_TILE);
+  auto rhs_sm_tile_shape = CoordDyn(K_TILE, N_TILE);
+  auto out_sm_tile_shape = CoordDyn(M_TILE, N_TILE);
 
   // make sure inner block looks like this, to ensure coalescing
-  auto per_block_data_shape = Coord(Y_THREAD, X_THREAD);
+  auto per_block_data_shape = CoordDyn(Y_THREAD, X_THREAD);
 
-  Matrix<float> lhs_mat = Matrix<float>(lhs, lhs_shape);
-  Matrix<float> rhs_mat = Matrix<float>(rhs, rhs_shape);
-  Matrix<float> out_mat = Matrix<float>(out, out_shape);
+  MatrixDyn<float> lhs_mat = MatrixDyn<float>(lhs, lhs_shape);
+  MatrixDyn<float> rhs_mat = MatrixDyn<float>(rhs, rhs_shape);
+  MatrixDyn<float> out_mat = MatrixDyn<float>(out, out_shape);
 
-  Matrix<float> lhs_shared_mat = make_shared<M_TILE, K_TILE, float>();
-  Matrix<float> rhs_shared_mat = make_shared<K_TILE, N_TILE, float>();
-  // Matrix<half> lhs_shared_mat = make_shared<M_TILE, K_TILE, half>();
-  // Matrix<half> rhs_shared_mat = make_shared<K_TILE, N_TILE, half>();
-  // Matrix<float> out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
+  MatrixDyn<float> lhs_shared_mat = make_shared<M_TILE, K_TILE, float>();
+  MatrixDyn<float> rhs_shared_mat = make_shared<K_TILE, N_TILE, float>();
+  // MatrixDyn<half> lhs_shared_mat = make_shared<M_TILE, K_TILE, half>();
+  // MatrixDyn<half> rhs_shared_mat = make_shared<K_TILE, N_TILE, half>();
+  // MatrixDyn<float> out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
   //
 
-  Matrix<float> partial_sum = make_local<CEIL_DIV(M_TILE, Y_THREAD),
-                                         CEIL_DIV(N_TILE, X_THREAD), float>();
+  MatrixDyn<float> partial_sum =
+      make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD),
+                 float>();
 
   const int M_REG = 16;
   const int K_REG = 8;
   const int N_REG = 8;
 
-  // Matrix<float> partial_sum = make_local<M_REG, N_REG, float>();
+  // MatrixDyn<float> partial_sum = make_local<M_REG, N_REG, float>();
 
   // const int M_TILE = 128;
   // const int N_TILE = 128;
@@ -145,25 +149,27 @@ __global__ void _matmul_tuned_with_mma_kernel(int M, int N, int K, float alpha,
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
     for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
       for (int kin = 0; kin < CEIL_DIV(K_TILE, X_THREAD); kin++) {
-        lhs_shared_mat.tile(Coord(m, kin), per_block_data_shape)
-            .dist_to(Coord(threadIdx.y, threadIdx.x)) =
-            lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape)
-                .tile(Coord(m, kin), per_block_data_shape)
-                .dist_to(Coord(threadIdx.y, threadIdx.x));
+        lhs_shared_mat.tile(CoordDyn(m, kin), per_block_data_shape)
+            .dist_to(CoordDyn(threadIdx.y, threadIdx.x)) =
+            lhs_mat.tile(CoordDyn(blockIdx.y, ko), lhs_sm_tile_shape)
+                .tile(CoordDyn(m, kin), per_block_data_shape)
+                .dist_to(CoordDyn(threadIdx.y, threadIdx.x));
       }
     }
-    // lhs_shared_mat <= lhs_mat.tile(Coord(blockIdx.y, ko), lhs_sm_tile_shape);
+    // lhs_shared_mat <= lhs_mat.tile(CoordDyn(blockIdx.y, ko),
+    // lhs_sm_tile_shape);
 
     for (int kin = 0; kin < CEIL_DIV(K_TILE, Y_THREAD); kin++) {
       for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-        rhs_shared_mat.tile(Coord(kin, n), per_block_data_shape)
-            .dist_to(Coord(threadIdx.y, threadIdx.x)) =
-            rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape)
-                .tile(Coord(kin, n), per_block_data_shape)
-                .dist_to(Coord(threadIdx.y, threadIdx.x));
+        rhs_shared_mat.tile(CoordDyn(kin, n), per_block_data_shape)
+            .dist_to(CoordDyn(threadIdx.y, threadIdx.x)) =
+            rhs_mat.tile(CoordDyn(ko, blockIdx.x), rhs_sm_tile_shape)
+                .tile(CoordDyn(kin, n), per_block_data_shape)
+                .dist_to(CoordDyn(threadIdx.y, threadIdx.x));
       }
     }
-    // rhs_shared_mat <= rhs_mat.tile(Coord(ko, blockIdx.x), rhs_sm_tile_shape);
+    // rhs_shared_mat <= rhs_mat.tile(CoordDyn(ko, blockIdx.x),
+    // rhs_sm_tile_shape);
 
     __syncthreads();
 
@@ -174,9 +180,9 @@ __global__ void _matmul_tuned_with_mma_kernel(int M, int N, int K, float alpha,
     //   for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
     //     mma_m16n8k8_f16f32_neo(
     //       partial_sum,
-    //       lhs_shared_mat.tile(Coord(threadIdx.y, kin), Coord(M_REG, K_REG)),
-    //       rhs_shared_mat.tile(Coord(kin, n), Coord(K_REG, N_REG)),
-    //       partial_sum);
+    //       lhs_shared_mat.tile(CoordDyn(threadIdx.y, kin), CoordDyn(M_REG,
+    //       K_REG)), rhs_shared_mat.tile(CoordDyn(kin, n), CoordDyn(K_REG,
+    //       N_REG)), partial_sum);
     //   }
     // }
   }
@@ -184,17 +190,17 @@ __global__ void _matmul_tuned_with_mma_kernel(int M, int N, int K, float alpha,
 
   for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
     for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-      out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-          .tile(Coord(m, n), per_block_data_shape)
-          .dist_to(Coord(threadIdx.y, threadIdx.x)) =
-          partial_sum.dist_to(Coord(m, n));
+      out_mat.tile(CoordDyn(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+          .tile(CoordDyn(m, n), per_block_data_shape)
+          .dist_to(CoordDyn(threadIdx.y, threadIdx.x)) =
+          partial_sum.dist_to(CoordDyn(m, n));
     }
   }
   // for (int m = 0; m < CEIL_DIV(M_TILE, M_REG); m++) {
   //   for (int n = 0; n < CEIL_DIV(N_TILE, N_REG); n++) {
-  //     out_mat.tile(Coord(blockIdx.y, blockIdx.x), out_sm_tile_shape)
-  //       .tile(Coord(m, n), Coord(M_REG, N_REG))
-  //       .dist_to(Coord(threadIdx.y, threadIdx.x))
+  //     out_mat.tile(CoordDyn(blockIdx.y, blockIdx.x), out_sm_tile_shape)
+  //       .tile(CoordDyn(m, n), CoordDyn(M_REG, N_REG))
+  //       .dist_to(CoordDyn(threadIdx.y, threadIdx.x))
   //       = partial_sum.dist_to_thread();
   //   }
   // }

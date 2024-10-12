@@ -8,11 +8,21 @@ namespace catz {
 
 #define MAKE_SHARED(matrixVar, size, type)                                     \
   __shared__ type matrixVar##_data[size];                                      \
-  Matrix<type> matrixVar = Matrix<type>(matrixVar##_data, Coord(1, size))
+  MatrixDyn<type> matrixVar =                                                  \
+      MatrixDyn<type>(matrixVar##_data, CoordDyn(1, size))
 
 #define MAKE_SHARED(matrixVar, size_x, size_y, type)                           \
   __shared__ type matrixVar##_data[size_x * size_y];                           \
-  Matrix<type> matrixVar = Matrix<type>(matrixVar##_data, Coord(size_x, size_y))
+  MatrixDyn<type> matrixVar =                                                  \
+      MatrixDyn<type>(matrixVar##_data, CoordDyn(size_x, size_y))
+
+// #define MAKE_SHARED(matrixVar, size, type)                                     \
+//   __shared__ type matrixVar##_data[size];                                      \
+//   Matrix<type> matrixVar = Matrix<type>(matrixVar##_data, CoordDyn(1, size))
+//
+// #define MAKE_SHARED(matrixVar, size_x, size_y, type) \
+//   __shared__ type matrixVar##_data[size_x * size_y]; \ Matrix<type> matrixVar
+//   = Matrix<type>(matrixVar##_data, CoordDyn(size_x, size_y))
 
 // TEST UTILS
 // static check at compile time

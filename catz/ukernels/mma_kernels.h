@@ -38,9 +38,10 @@ inline __device__ void initialize_unsigned_tf32(unsigned *A, int elems,
   }
 }
 
-inline __device__ void mma_m16n8k16_f16f32_neo(Matrix<float> d, Matrix<half> a,
-                                               Matrix<half> b,
-                                               Matrix<float> c) {
+inline __device__ void mma_m16n8k16_f16f32_neo(MatrixDyn<float> d,
+                                               MatrixDyn<half> a,
+                                               MatrixDyn<half> b,
+                                               MatrixDyn<float> c) {
   unsigned A[4];
   unsigned B[2];
   float C[4];
@@ -83,7 +84,7 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
   int lorr_id = lane_id % 16;
   const half *a_new = a + lorr_id * 16 + lorr * 8;
 
-  // TODO: pack all these abstractions back to Matrix
+  // TODO: pack all these abstractions back to MatrixDyn
   asm volatile(
       "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
       : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
@@ -130,8 +131,10 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
   d[row_c_ex * 8 + col_c + 1] = D[3];
 }
 
-inline __device__ void mma_m16n8k8_f16f32_neo(Matrix<float> d, Matrix<half> a,
-                                              Matrix<half> b, Matrix<float> c) {
+inline __device__ void mma_m16n8k8_f16f32_neo(MatrixDyn<float> d,
+                                              MatrixDyn<half> a,
+                                              MatrixDyn<half> b,
+                                              MatrixDyn<float> c) {
   // TODO:
   // make decl inside
   // wrap mma.sync as kernel itself
@@ -174,7 +177,7 @@ inline __device__ void mma_m16n8k8_f16f32(float *d, const half *a,
   int lorr_id = lane_id % 16;
   const half *a_new = a + lorr_id * 8;
 
-  // TODO: pack all these abstractions back to Matrix
+  // TODO: pack all these abstractions back to MatrixDyn
   asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
                : "=r"(A[0]), "=r"(A[1])
                : "r"(get_smem_ptr(a_new)));
@@ -259,7 +262,7 @@ inline __device__ void mma_m16n8k8_tf32f32(float *d, const float *a,
   // NOTE: in fp16 case, was 8 and 16 as x, y strides
   const float *a_new = a + lorr_id * 8 + lorr * 4;
 
-  // TODO: pack all these abstractions back to Matrix
+  // TODO: pack all these abstractions back to MatrixDyn
   asm volatile(
       "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
       : "=r"(A[0]), "=r"(A[1]), "=r"(A[2]), "=r"(A[3])
@@ -320,7 +323,7 @@ inline __device__ void mma_m16n8k4_tf32f32(float *d, const float *a,
   int lorr_id = lane_id % 16;
   const float *a_new = a + lorr_id * 4;
 
-  // TODO: pack all these abstractions back to Matrix
+  // TODO: pack all these abstractions back to MatrixDyn
   asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
                : "=r"(A[0]), "=r"(A[1])
                : "r"(get_smem_ptr(a_new)));
