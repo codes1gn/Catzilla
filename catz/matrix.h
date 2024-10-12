@@ -13,6 +13,7 @@
 #include <tuple>
 #include <type_traits>
 
+#include "coord.h"
 #include "cuda_utils.h"
 #include "macro.h"
 
@@ -53,138 +54,6 @@ inline __device__ int tiling_(int tile_id_x, int tile_id_y, int to_stride_x,
             tile_id_y * to_stride_y * from_stride_y;
   return idx;
 }
-
-// template<int X, int Y>
-struct CoordDyn {
-  int first;
-  int second;
-
-  // 构造函数
-  constexpr __device__ CoordDyn(int first, int second)
-      : first(first), second(second) {}
-
-  // 从 std::tuple<int, int> 构造
-  constexpr __device__ CoordDyn(const std::tuple<int, int> &t)
-      : first(std::get<0>(t)), second(std::get<1>(t)) {}
-
-  // 将 CoordDyn 转换为 std::tuple<int, int>
-  constexpr __device__ std::tuple<int, int> to_tuple() const {
-    return std::make_tuple(first, second);
-  }
-
-  constexpr CoordDyn operator+(const CoordDyn &other) const {
-    return CoordDyn(first + other.first, second + other.second);
-  }
-
-  constexpr CoordDyn operator-(const CoordDyn &other) const {
-    return CoordDyn(first - other.first, second - other.second);
-  }
-
-  constexpr CoordDyn operator*(const CoordDyn &other) const {
-    return CoordDyn(first * other.first, second * other.second);
-  }
-
-  constexpr CoordDyn operator/(const CoordDyn &other) const {
-    return CoordDyn(first / other.first, second / other.second);
-  }
-
-  constexpr __device__ CoordDyn &xor_swizzle() {
-    auto i16 = (first * 32 + second) * sizeof(float) / 16;
-    auto y16 = i16 / 8;
-    auto x16 = i16 % 8;
-    auto x16_swz = y16 ^ x16;
-    auto x_swz =
-        x16_swz * 16 / sizeof(float) % 32 + second % (16 / sizeof(float));
-    second = x_swz % 32;
-    first = x_swz / 32;
-    return *this;
-  }
-
-  constexpr __device__ CoordDyn &xor_swizzle_col() {
-    auto i = (first * 16 + second);
-    auto i_swz = (first * 16 + second) ^ first;
-    second = i_swz % 16;
-    first = i_swz / 16;
-    return *this;
-  }
-
-  constexpr __device__ CoordDyn &xor_swizzle_row() {
-    auto i = (first * 16 + second);
-    auto i_swz = (first * 16 + second) ^ second;
-    second = i_swz % 16;
-    first = i_swz / 16;
-    return *this;
-  }
-};
-
-template <int ROWS, int COLS>
-struct Coord {
-  static_assert(ROWS != 0, "first dim cannot be zero.");
-  static_assert(COLS != 0, "second dim cannot be zero.");
-  static constexpr int first = ROWS;
-  static constexpr int second = COLS;
-
-  // 构造函数
-  constexpr __device__ Coord() {}
-
-  template <int ofirst, int osecond>
-  constexpr Coord<first + ofirst, second + osecond>
-  operator+(const Coord<ofirst, osecond> &other) const {
-    return Coord<first + other.first, second + other.second>();
-  }
-
-  template <int ofirst, int osecond>
-  constexpr Coord<first - ofirst, second - osecond>
-  operator-(const Coord<ofirst, osecond> &other) const {
-    return Coord<first - other.first, second - other.second>();
-  }
-
-  template <int ofirst, int osecond>
-  constexpr Coord<first * ofirst, second * osecond>
-  operator*(const Coord<ofirst, osecond> &other) const {
-    return Coord<first * other.first, second * other.second>();
-  }
-
-  template <int ofirst, int osecond>
-  constexpr Coord<first / ofirst, second / osecond>
-  operator/(const Coord<ofirst, osecond> &other) const {
-    static_assert(second != 0 && other.second != 0, "Division by zero");
-    return Coord<first / other.first, second / other.second>();
-  }
-
-  constexpr __device__ Coord &xor_swizzle() {
-    auto i16 = (first * 32 + second) * sizeof(float) / 16;
-    auto y16 = i16 / 8;
-    auto x16 = i16 % 8;
-    auto x16_swz = y16 ^ x16;
-    auto x_swz =
-        x16_swz * 16 / sizeof(float) % 32 + second % (16 / sizeof(float));
-    second = x_swz % 32;
-    first = x_swz / 32;
-    return *this;
-  }
-
-  constexpr __device__ Coord &xor_swizzle_col() {
-    constexpr auto i = (first * 16 + second);
-    constexpr auto i_swz = i ^ first;
-    // auto _second = i_swz % 16;
-    // auto _first = i_swz / 16;
-    // return *this;
-    return Coord<(i_swz / 16), (i_swz % 16)>();
-  }
-
-  constexpr __device__ Coord &xor_swizzle_row() {
-    constexpr auto i = (first * 16 + second);
-    constexpr auto i_swz = i ^ second;
-    // second = i_swz % 16;
-    // first = i_swz / 16;
-    // return *this;
-    return Coord<(i_swz / 16), (i_swz % 16)>();
-  }
-};
-
-#define make_coord(rows, cols) Coord<rows, cols>()
-// #define Coord(rows, cols) Coord<rows, cols>()
 
 template <typename T, typename CoordType, typename CoordType2>
 struct MatrixNightly;
