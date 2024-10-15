@@ -27,78 +27,29 @@ TEST_CASE("coord construction", "[coord][construction]") {
 }
 
 
-// TEST_CASE("coord add", "[coord][add]") {
-//   CoordDyn coord1 = CoordDyn(1, 2);
-//   CoordDyn coord2 = CoordDyn(4, 5);
-//   CoordDyn coord3 = coord1 + coord2;
-//
-//   REQUIRE(coord1.isDynamic() == true);
-//
-//   CHECK(coord3.rows == 5);
-//   CHECK(coord3.cols == 7);
-// }
+TEST_CASE("coord add", "[coord][add]") {
+  constexpr int r = 2;
+  constexpr int c = 3;
+  constexpr auto coord1 = make_coord(r, c);  // 使用编译期常量
+  constexpr auto coord2 = make_coord(4, 5);
+  constexpr auto coord3 = coord1 + coord2;
 
-// TEST_CASE("coord sub", "[coord][sub]") {
-//   CoordDyn coord1 = CoordDyn(1, 2);
-//   CoordDyn coord2 = CoordDyn(4, 5);
-//   CoordDyn coord3 = coord1 - coord2;
-//
-//   REQUIRE(coord1.isDynamic() == true);
-//
-//   CHECK(coord3.rows == -3);
-//   CHECK(coord3.cols == -3);
-// }
-//
-// TEST_CASE("coord div", "[coord][div]") {
-//   CoordDyn coord1 = CoordDyn(1, 2);
-//   CoordDyn coord2 = CoordDyn(4, 8);
-//   CoordDyn coord3 = coord2 / coord1;
-//
-//   REQUIRE(coord1.isDynamic() == true);
-//
-//   CHECK(coord3.rows == 4);
-//   CHECK(coord3.cols == 4);
-// }
-//
-// TEST_CASE("coord construction nightly", "[coord][construction]") {
-//   Coord coord1 = Coord<1, 2>();
-//
-//   REQUIRE(coord1.isDynamic() == false);
-//
-//   SCHECK(coord1.rows == 1);
-//   SCHECK(coord1.cols == 2);
-// }
-//
-// TEST_CASE("coord add nightly", "[coord][add]") {
-//   auto coord1 = Coord<1, 2>();
-//   auto coord2 = Coord<4, 5>();
-//   auto coord3 = coord1 + coord2;
-//
-//   REQUIRE(coord1.isDynamic() == false);
-//
-//   SCHECK(coord3.rows == 5);
-//   SCHECK(coord3.cols == 7);
-// }
-//
-// TEST_CASE("coord sub nightly", "[coord][sub]") {
-//   auto coord1 = Coord<1, 2>();
-//   auto coord2 = Coord<4, 5>();
-//   auto coord3 = coord1 - coord2;
-//
-//   REQUIRE(coord1.isDynamic() == false);
-//
-//   SCHECK(coord3.rows == -3);
-//   SCHECK(coord3.cols == -3);
-// }
-//
-// TEST_CASE("coord div nightly", "[coord][div]") {
-//   auto coord1 = Coord<1, 2>();
-//   auto coord2 = Coord<4, 8>();
-//   auto coord3 = coord2 / coord1;
-//
-//   REQUIRE(coord1.isDynamic() == false);
-//
-//   SCHECK(coord3.rows == 4);
-//   SCHECK(coord3.cols == 4);
-// }
-//
+  // SCHECK(coord1.isStatic() == true);
+
+  SCHECK(coord3.rows() == 6);
+  SCHECK(coord3.cols() == 8);
+}
+
+TEST_CASE("coord sub", "[coord][sub]") {
+  constexpr int r = 2;
+  constexpr int c = 3;
+  constexpr auto coord1 = make_coord(r, c);  // 使用编译期常量
+  constexpr auto coord2 = make_coord(4, 5);
+  constexpr auto coord3 = coord1 - coord2;
+
+  // SCHECK(coord3.rows.isStatic() == true);
+
+  CHECK(coord3.rows() == -2);
+  SCHECK(coord3.cols() == -2);
+}
+

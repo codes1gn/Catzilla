@@ -73,3 +73,15 @@ TEST_CASE("index div", "[index][div]") {
     auto res_dyn = idx1 / idx2;
   CHECK(res_dyn.value == 3);
 }
+
+TEST_CASE("index mod", "[index][mod]") {
+  constexpr auto idx1 = make_index(10);  // 编译期常量
+    constexpr auto idx2 = make_index(3);   // 编译期常量
+    constexpr auto res = idx1 % idx2;
+  SCHECK(res.value == 1);
+
+  auto idx1_dyn = make_index(10);  // 编译期常量
+    auto idx2_dyn = make_index(3);   // 编译期常量
+    auto res_dyn = idx1 % idx2;
+  CHECK(res_dyn.value == 1);
+}

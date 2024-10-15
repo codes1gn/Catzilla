@@ -20,9 +20,67 @@ struct CoordNightly {
   constexpr auto eval_rows() const { return rows(); }
   constexpr auto eval_cols() const { return cols(); }
 
+  // constexpr auto isStatic() { return rows::isStatic() && cols::isStatic(); }
+  // constexpr auto isDynamic() { return rows::isDynamic() || cols::isDynamic();
+  // }
+
   std::string str() const {
     return "Coord<" + std::to_string(rows()) + ", " + std::to_string(cols()) +
            ">";
+  }
+
+  template <typename OtherRowIndex, typename OtherColIndex>
+  constexpr auto
+  operator+(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
+    auto new_row_index = rows + other.rows;
+    auto new_col_index = cols + other.cols;
+    return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
+        new_row_index, new_col_index);
+  }
+
+  template <typename OtherRowIndex, typename OtherColIndex>
+  constexpr auto
+  operator-(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
+    auto new_row_index = rows - other.rows;
+    auto new_col_index = cols - other.cols;
+    return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
+        new_row_index, new_col_index);
+  }
+
+  template <typename OtherRowIndex, typename OtherColIndex>
+  constexpr auto
+  operator*(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
+    auto new_row_index = rows * other.rows;
+    auto new_col_index = cols * other.cols;
+    return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
+        new_row_index, new_col_index);
+  }
+
+  template <typename OtherRowIndex, typename OtherColIndex>
+  constexpr auto
+  operator/(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
+    auto new_row_index = rows / other.rows;
+    auto new_col_index = cols / other.cols;
+    return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
+        new_row_index, new_col_index);
+  }
+
+  template <typename OtherRowIndex, typename OtherColIndex>
+  constexpr auto
+  operator%(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
+    auto new_row_index = rows % other.rows;
+    auto new_col_index = cols % other.cols;
+    return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
+        new_row_index, new_col_index);
+  }
+
+  template <typename OtherRowIndex, typename OtherColIndex>
+  constexpr auto
+  ceil_div(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
+    auto new_row_index = rows.ceil_div(other.rows);
+    auto new_col_index = cols.ceil_div(other.cols);
+    return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
+        new_row_index, new_col_index);
   }
 };
 
@@ -198,76 +256,6 @@ struct Coord {
   //   return Coord<(i_swz / 16), (i_swz % 16)>();
   // }
 };
-
-// 通用模板：用于 Coord + Coord，相加返回 Coord
-template <
-    typename T1, typename T2,
-    typename = std::enable_if_t<std::is_same_v<T1, Coord<T1::rows, T1::cols>> &&
-                                std::is_same_v<T2, Coord<T2::rows, T2::cols>>>>
-constexpr auto operator+(const T1 &, const T2 &) {
-  return Coord<T1::rows + T2::rows, T1::cols + T2::cols>{};
-}
-
-// 通用模板：用于 CoordDyn + CoordDyn，相加返回 CoordDyn
-template <typename T1, typename T2,
-          typename = std::enable_if_t<std::is_same_v<T1, CoordDyn> &&
-                                      std::is_same_v<T2, CoordDyn>>>
-CoordDyn operator+(const T1 &lhs, const T2 &rhs) {
-  return CoordDyn(lhs.rows + rhs.rows, lhs.cols + rhs.cols);
-}
-
-// // 通用模板：用于混合类型加法（Coord + CoordDyn 或 CoordDyn + Coord），返回
-// CoordDyn template <typename T1, typename T2,
-//           typename = std::enable_if_t<
-//               (std::is_same_v<T1, CoordDyn> && std::is_same_v<T2,
-//               Coord<T2::rows, T2::cols>>) || (std::is_same_v<T2, CoordDyn> &&
-//               std::is_same_v<T1, Coord<T1::rows, T1::cols>>)>>
-// CoordDyn operator+(const T1& lhs, const T2& rhs) {
-//     int new_rows = lhs.rows + rhs.rows;
-//     int new_cols = lhs.cols + rhs.cols;
-//     return CoordDyn(new_rows, new_cols);
-// }
-
-// 4. make_coord 函数：支持静态和动态版本
-// template <typename T1, typename T2>
-// auto make_coord(T1 rows, T2 cols) {
-//     // 提升参数
-//     auto promoted_rows = promote(rows);
-//     auto promoted_cols = promote(cols);
-//
-//     if constexpr (std::is_same_v<decltype(promoted_rows),
-//     std::integral_constant<int, promoted_rows()>> &&
-//                   std::is_same_v<decltype(promoted_cols),
-//                   std::integral_constant<int, promoted_cols()>>) {
-//         // 如果参数是编译期常量，则使用 Coord 模板
-//         return Coord<promoted_rows(), promoted_cols()>{};
-//     } else {
-//         // 否则使用 CoordDyn（运行时版本）
-//         return CoordDyn(rows, cols);
-//     }
-// }
-
-#define make_coord_nightly(rows, cols)                                         \
-  ([&]() {                                                                     \
-    if constexpr (std::is_integral_v<decltype(rows)> &&                        \
-                  std::is_integral_v<decltype(cols)> &&                        \
-                  IS_CONSTANT_EVALUATED()) {                                   \
-      return Coord<std::integral_constant<int, rows>(),                        \
-                   std::integral_constant<int, cols>()>();                     \
-    } else {                                                                   \
-      return CoordDyn(rows, cols);                                             \
-    }                                                                          \
-  }())
-// // #define Coord(rows, cols) Coord<rows, cols>()
-// template <int ROWS, int COLS>
-// constexpr Coord<ROWS, COLS> make_coord(std::integral_constant<int, ROWS>,
-//                                        std::integral_constant<int, COLS>) {
-//     return Coord<ROWS, COLS>();
-// }
-//
-// CoordDyn make_coord(int rows, int cols) {
-//     return CoordDyn(rows, cols);
-// }
 
 } // namespace catz
 
