@@ -20,11 +20,30 @@
 // TODO: rename to matrix.h
 namespace catz {
 
-template <typename T>
-struct is_allowed_type
-    : std::disjunction<std::is_same<T, float>, std::is_same<T, half>,
-                       std::is_same<T, __nv_bfloat16>,
-                       std::is_same<T, float4>> {};
+// template <typename ShapeCoord, typename StrideCoord>
+// struct MatrixInfo {
+//     ShapeCoord shape;
+//     StrideCoord stride;
+//
+//     __device__ MatrixInfo(ShapeCoord s, StrideCoord st) : shape(s),
+//     stride(st) {}
+//
+//     constexpr auto rows() const {
+//     return shape.rows();
+//   }
+//
+//     void print_info() const {
+//         std::cout << "Matrix Shape: " << shape.str()
+//                   << ", Stride: " << stride.str() << std::endl;
+//     }
+// };
+//
+// template <typename ShapeCoord, typename StrideCoord>
+// constexpr __device__ auto make_matrix_info(ShapeCoord&& shape, StrideCoord&&
+// stride) {
+//     return MatrixInfo<std::decay_t<ShapeCoord>,
+//     std::decay_t<StrideCoord>>(shape, stride);
+// }
 
 // concept DataType = std::is_same_v<T, float> || std::is_same_v<T, half> ||
 // std::is_same_v<T, float4>;

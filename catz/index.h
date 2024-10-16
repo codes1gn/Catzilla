@@ -12,8 +12,7 @@ struct Index {
 
   constexpr T operator()() const { return value; }
 
-  constexpr bool isStatic() { return std::false_type::value; }
-  constexpr bool isDynamic() { return std::true_type::value; }
+  constexpr bool isStatic() const { return false; }
 
   constexpr Index operator+(const Index &other) const {
     return Index(value + other.value);
@@ -42,12 +41,11 @@ struct Index {
 
 template <typename T>
 struct Index<T, std::enable_if_t<is_compile_time_constant<T>::value>> {
-  static constexpr T value = T{};
+  static constexpr T value = 42;
 
   constexpr T operator()() const { return value; }
 
-  constexpr bool isStatic() { return std::true_type::value; }
-  constexpr bool isDynamic() { return std::false_type::value; }
+  constexpr bool isStatic() const { return true; }
 
   template <typename U>
   constexpr Index operator+(const Index<U> &other) const {

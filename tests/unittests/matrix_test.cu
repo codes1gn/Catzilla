@@ -110,3 +110,16 @@ TEST_CUDA_CASE(matrix_dist_to_coord, "matrix dist to coord", "[matrix][dist]") {
   assert(rhs_mat.data[3] == 0.13);
   assert(rhs_mat.data[4] == 0.13);
 }
+
+// TEST_CUDA_CASE(matrix_create, "matrix create", "[matrix][create]") {
+//   int data[12] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+//   constexpr auto shape = make_coord(3, 4);
+//   constexpr auto stride = make_coord(4, 1);  // 按行主序存储
+//   constexpr auto matrix = make_matrix_info(shape, stride);
+//
+//   SCHECK(shape.rows() == 3);
+//   SCHECK(stride.rows() == 4);
+//
+//   constexpr auto rows = matrix.rows();
+//   SCHECK(rows == 3);
+// }
