@@ -144,85 +144,6 @@ namespace catz {
 
 ////////////////////////////////////////////////////
 
-// template<int X, int Y>
-struct CoordDyn {
-  int rows;
-  int cols;
-
-  // 构造函数
-  constexpr __device__ CoordDyn(int rows, int cols) : rows(rows), cols(cols) {}
-
-  // 从 std::tuple<int, int> 构造
-  constexpr __device__ CoordDyn(const std::tuple<int, int> &t)
-      : rows(std::get<0>(t)), cols(std::get<1>(t)) {}
-
-  //////////////////////////////////////
-  /// utils
-  //////////////////////////////////////
-
-  std::string str() const {
-    char buffer[20]; // 提供足够大的缓冲区
-    std::sprintf(buffer, "CoordDyn<%d, %d>", rows, cols);
-    return std::string(buffer);
-  }
-
-  constexpr bool isStatic() { return false; }
-  constexpr bool isDynamic() { return true; }
-
-  //////////////////////////////////////
-  /// operators
-  //////////////////////////////////////
-
-  // 将 CoordDyn 转换为 std::tuple<int, int>
-  constexpr __device__ std::tuple<int, int> to_tuple() const {
-    return std::make_tuple(rows, cols);
-  }
-
-  // constexpr CoordDyn operator+(const CoordDyn &other) const {
-  //   return CoordDyn(rows + other.rows, cols + other.cols);
-  // }
-
-  // constexpr CoordDyn operator-(const CoordDyn &other) const {
-  //   return CoordDyn(rows - other.rows, cols - other.cols);
-  // }
-  //
-  // constexpr CoordDyn operator*(const CoordDyn &other) const {
-  //   return CoordDyn(rows * other.rows, cols * other.cols);
-  // }
-  //
-  // constexpr CoordDyn operator/(const CoordDyn &other) const {
-  //   return CoordDyn(rows / other.rows, cols / other.cols);
-  // }
-  //
-  // constexpr __device__ CoordDyn &xor_swizzle() {
-  //   auto i16 = (rows * 32 + cols) * sizeof(float) / 16;
-  //   auto y16 = i16 / 8;
-  //   auto x16 = i16 % 8;
-  //   auto x16_swz = y16 ^ x16;
-  //   auto x_swz =
-  //       x16_swz * 16 / sizeof(float) % 32 + cols % (16 / sizeof(float));
-  //   cols = x_swz % 32;
-  //   rows = x_swz / 32;
-  //   return *this;
-  // }
-  //
-  // constexpr __device__ CoordDyn &xor_swizzle_col() {
-  //   auto i = (rows * 16 + cols);
-  //   auto i_swz = (rows * 16 + cols) ^ rows;
-  //   cols = i_swz % 16;
-  //   rows = i_swz / 16;
-  //   return *this;
-  // }
-  //
-  // constexpr __device__ CoordDyn &xor_swizzle_row() {
-  //   auto i = (rows * 16 + cols);
-  //   auto i_swz = (rows * 16 + cols) ^ cols;
-  //   cols = i_swz % 16;
-  //   rows = i_swz / 16;
-  //   return *this;
-  // }
-};
-
 template <int ROWS, int COLS>
 // typename = std::enable_if_t<(ROWS >= 0 && COLS >= 0 &&
 // std::is_const_v<decltype(ROWS)>)>>
@@ -303,6 +224,85 @@ struct Coord {
   //   // rows = i_swz / 16;
   //   // return *this;
   //   return Coord<(i_swz / 16), (i_swz % 16)>();
+  // }
+};
+
+// template<int X, int Y>
+struct CoordDyn {
+  int rows;
+  int cols;
+
+  // 构造函数
+  constexpr __device__ CoordDyn(int rows, int cols) : rows(rows), cols(cols) {}
+
+  // 从 std::tuple<int, int> 构造
+  constexpr __device__ CoordDyn(const std::tuple<int, int> &t)
+      : rows(std::get<0>(t)), cols(std::get<1>(t)) {}
+
+  //////////////////////////////////////
+  /// utils
+  //////////////////////////////////////
+
+  std::string str() const {
+    char buffer[20]; // 提供足够大的缓冲区
+    std::sprintf(buffer, "CoordDyn<%d, %d>", rows, cols);
+    return std::string(buffer);
+  }
+
+  constexpr bool isStatic() { return false; }
+  constexpr bool isDynamic() { return true; }
+
+  //////////////////////////////////////
+  /// operators
+  //////////////////////////////////////
+
+  // 将 CoordDyn 转换为 std::tuple<int, int>
+  constexpr __device__ std::tuple<int, int> to_tuple() const {
+    return std::make_tuple(rows, cols);
+  }
+
+  // constexpr CoordDyn operator+(const CoordDyn &other) const {
+  //   return CoordDyn(rows + other.rows, cols + other.cols);
+  // }
+
+  // constexpr CoordDyn operator-(const CoordDyn &other) const {
+  //   return CoordDyn(rows - other.rows, cols - other.cols);
+  // }
+  //
+  // constexpr CoordDyn operator*(const CoordDyn &other) const {
+  //   return CoordDyn(rows * other.rows, cols * other.cols);
+  // }
+  //
+  // constexpr CoordDyn operator/(const CoordDyn &other) const {
+  //   return CoordDyn(rows / other.rows, cols / other.cols);
+  // }
+  //
+  // constexpr __device__ CoordDyn &xor_swizzle() {
+  //   auto i16 = (rows * 32 + cols) * sizeof(float) / 16;
+  //   auto y16 = i16 / 8;
+  //   auto x16 = i16 % 8;
+  //   auto x16_swz = y16 ^ x16;
+  //   auto x_swz =
+  //       x16_swz * 16 / sizeof(float) % 32 + cols % (16 / sizeof(float));
+  //   cols = x_swz % 32;
+  //   rows = x_swz / 32;
+  //   return *this;
+  // }
+  //
+  // constexpr __device__ CoordDyn &xor_swizzle_col() {
+  //   auto i = (rows * 16 + cols);
+  //   auto i_swz = (rows * 16 + cols) ^ rows;
+  //   cols = i_swz % 16;
+  //   rows = i_swz / 16;
+  //   return *this;
+  // }
+  //
+  // constexpr __device__ CoordDyn &xor_swizzle_row() {
+  //   auto i = (rows * 16 + cols);
+  //   auto i_swz = (rows * 16 + cols) ^ cols;
+  //   cols = i_swz % 16;
+  //   rows = i_swz / 16;
+  //   return *this;
   // }
 };
 

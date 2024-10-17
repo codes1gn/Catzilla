@@ -25,8 +25,8 @@ using namespace catz;
 //   CHECK(dynamic_coord.rows() == 5);
 //   CHECK(dynamic_coord.cols() == 6);
 // }
-//
-//
+
+
 // TEST_CASE("coord add", "[coord][add]") {
 //   constexpr int r = 2;
 //   constexpr int c = 3;
