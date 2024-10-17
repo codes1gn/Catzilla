@@ -9,144 +9,45 @@
 
 namespace catz {
 
-// NOTE: explicit design of Coord
-// // Coord 结构体，包含 rows 和 cols 两个成员
-// template <typename T1, typename T2, typename=void>
-// struct CoordNightly {
-//     IndexWrapper<T1> rows;
-//     IndexWrapper<T2> cols;
-//
-//     constexpr CoordNightly(T1 r, T2 c) : rows(make_index(r)),
-//     cols(make_index(c)) {}
-//
-//     constexpr auto area() const {
-//         return rows.get() * cols.get();
-//     }
-// };
-//
-// // 特化版本，用于编译期常量
-// template <typename T1, typename T2>
-// struct CoordNightly<T1, T2,
-// std::enable_if_t<is_compile_time_constant<T1>::value &&
-// is_compile_time_constant<T2>::value>> {
-//   static constexpr T1 rows = T1{};
-//   static constexpr T2 cols = T2{};
-//
-// };
-//
-// template <typename T1, typename T2, typename U1, typename U2>
-// constexpr auto operator+(const CoordNightly<T1, T2>& lhs, const
-// CoordNightly<U1, U2>& rhs) {
-//     using ResultT1 = std::conditional_t<is_compile_time_constant_v<T1> &&
-//     is_compile_time_constant_v<U1>, T1, std::decay_t<T1>>; using ResultT2 =
-//     std::conditional_t<is_compile_time_constant_v<T2> &&
-//     is_compile_time_constant_v<U2>, T2, std::decay_t<T2>>;
-//
-//     return CoordNightly<ResultT1, ResultT2>(lhs.rows.get() + rhs.rows.get(),
-//     lhs.cols.get() + rhs.cols.get());
-// }
-//
-// template <typename T1, typename T2>
-// using CoordWrapper = CoordNightly<std::decay_t<T1>, std::decay_t<T2>>;
-//
-// // make_coord 函数模板，用于创建 CoordNightly 实例
-// template <typename T1, typename T2>
-// constexpr CoordWrapper<T1, T2> make_coord(T1 &&r, T2 &&c) {
-//     return CoordWrapper<T1, T2>(std::forward<T1>(r), std::forward<T2>(c));
-// }
-
-// // NOTE: implicit design of Coord 类，使用 Index 作为参数封装行数和列数
-// template <typename RowIndex, typename ColIndex>
-// struct CoordNightly {
-//   RowIndex rows;
-//   ColIndex cols;
-//
-//   constexpr CoordNightly(RowIndex r, ColIndex c) : rows(r), cols(c) {}
-//
-//   constexpr auto eval_rows() const { return rows(); }
-//   constexpr auto eval_cols() const { return cols(); }
-//
-//   // constexpr auto isStatic() { return rows::isStatic() && cols::isStatic();
-//   }
-//   // constexpr auto isDynamic() { return rows::isDynamic() ||
-//   cols::isDynamic();
-//   // }
-//
-//   std::string str() const {
-//     return "Coord<" + std::to_string(rows()) + ", " + std::to_string(cols())
-//     +
-//            ">";
-//   }
-//
-//   template <typename OtherRowIndex, typename OtherColIndex>
-//   constexpr auto
-//   operator+(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
-//     auto new_row_index = rows + other.rows;
-//     auto new_col_index = cols + other.cols;
-//     return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
-//         new_row_index, new_col_index);
-//   }
-//
-//   template <typename OtherRowIndex, typename OtherColIndex>
-//   constexpr auto
-//   operator-(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
-//     auto new_row_index = rows - other.rows;
-//     auto new_col_index = cols - other.cols;
-//     return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
-//         new_row_index, new_col_index);
-//   }
-//
-//   template <typename OtherRowIndex, typename OtherColIndex>
-//   constexpr auto
-//   operator*(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
-//     auto new_row_index = rows * other.rows;
-//     auto new_col_index = cols * other.cols;
-//     return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
-//         new_row_index, new_col_index);
-//   }
-//
-//   template <typename OtherRowIndex, typename OtherColIndex>
-//   constexpr auto
-//   operator/(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
-//     auto new_row_index = rows / other.rows;
-//     auto new_col_index = cols / other.cols;
-//     return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
-//         new_row_index, new_col_index);
-//   }
-//
-//   template <typename OtherRowIndex, typename OtherColIndex>
-//   constexpr auto
-//   operator%(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
-//     auto new_row_index = rows % other.rows;
-//     auto new_col_index = cols % other.cols;
-//     return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
-//         new_row_index, new_col_index);
-//   }
-//
-//   template <typename OtherRowIndex, typename OtherColIndex>
-//   constexpr auto
-//   ceil_div(const CoordNightly<OtherRowIndex, OtherColIndex> &other) const {
-//     auto new_row_index = rows.ceil_div(other.rows);
-//     auto new_col_index = cols.ceil_div(other.cols);
-//     return CoordNightly<decltype(new_row_index), decltype(new_col_index)>(
-//         new_row_index, new_col_index);
-//   }
-// };
-//
-// // 工厂函数：根据参数类型构造 Coord
-// template <typename T1, typename T2>
-// constexpr auto make_coord(T1 &&row_value, T2 &&col_value) {
-//   auto row_index = make_index(std::forward<T1>(row_value));
-//   auto col_index = make_index(std::forward<T2>(col_value));
-//   return CoordNightly<decltype(row_index), decltype(col_index)>(row_index,
-//                                                                 col_index);
-// }
-
 ////////////////////////////////////////////////////
+#define DEFINE_BINARY_OPERATOR_FOR_COORD(op)                                   \
+  template <typename OtherRowType, typename OtherColType>                      \
+  constexpr auto operator op(const CoordS<OtherRowType, OtherColType> &other)  \
+      const {                                                                  \
+    auto new_rows = rows op other.rows;                                        \
+    auto new_cols = cols op other.cols;                                        \
+    return CoordS<decltype(new_rows), decltype(new_cols)>(new_rows, new_cols); \
+  }
+
+template <typename RowType, typename ColType>
+struct CoordS {
+  RowType rows;
+  ColType cols;
+
+  constexpr CoordS(RowType r, ColType c) : rows(r), cols(c) {}
+
+  constexpr bool isStatic() { return (rows.isStatic() && cols.isStatic()); }
+
+  DEFINE_BINARY_OPERATOR_FOR_COORD(+)
+  DEFINE_BINARY_OPERATOR_FOR_COORD(-)
+  DEFINE_BINARY_OPERATOR_FOR_COORD(*)
+  DEFINE_BINARY_OPERATOR_FOR_COORD(/)
+  DEFINE_BINARY_OPERATOR_FOR_COORD(%)
+
+  template <typename OtherRowType, typename OtherColType>
+  constexpr auto
+  ceil_div(const CoordS<OtherRowType, OtherColType> &other) const {
+    auto new_rows = (rows + other.rows - I1()) / other.rows;
+    auto new_cols = (cols + other.cols - I1()) / other.cols;
+    return CoordS<decltype(new_rows), decltype(new_cols)>(new_rows, new_cols);
+  }
+};
+
+#define make_coord(R, C) CoordS(Index<R>(), Index<C>())
+
+#define make_coord_dyn(R, C) CoordS(IndexDyn(R), IndexDyn(C))
 
 template <int ROWS, int COLS>
-// typename = std::enable_if_t<(ROWS >= 0 && COLS >= 0 &&
-// std::is_const_v<decltype(ROWS)>)>>
 struct Coord {
   static constexpr int rows = ROWS;
   static constexpr int cols = COLS;
