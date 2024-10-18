@@ -47,9 +47,8 @@ struct Matrix {
   template <typename NewShapeType>
   constexpr inline __device__ auto tile(const CoordDyn &tile_var,
                                         const NewShapeType &new_shape) {
-    // auto new_data = data + tile_var.rows * new_shape.rows * stride.rows +
-    //               tile_var.cols * new_shape.cols * stride.cols;
-    auto new_data = data + tile_var.rows * new_shape.rows;
+    auto new_data = data + tile_var.rows * new_shape.rows * stride.rows +
+                    tile_var.cols * new_shape.cols * stride.cols;
     return Matrix<T, NewShapeType, StrideType>(new_data, new_shape, stride);
   }
 };
