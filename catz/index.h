@@ -49,6 +49,38 @@ struct Index {
                                                                                \
   constexpr auto operator op(const IndexDyn &lhs, const IndexDyn &rhs) {       \
     return IndexDyn(lhs.value op rhs.value);                                   \
+  }                                                                            \
+  // /* Index + int */                                                   \
+  // template <int Value>                                                 \
+  // constexpr auto operator op(const Index<Value>& lhs, int rhs) {      \
+  //     return Index<Value op rhs>{};                                    \
+  // }                                                                    \
+  // /* int + Index */                                                    \
+  // template <int Value>                                                 \
+  // constexpr auto operator op(int lhs, const Index<Value>& rhs) {      \
+  //     return Index<lhs op Value>{};                                    \
+  // }                                                                    \
+
+#define DEFINE_POINTER_OPERATOR_FOR_INDEX(op)                                  \
+  /* need to constraint allowed type */                                        \
+  /* float* + Index */                                                         \
+  template <int Value>                                                         \
+  constexpr __device__ float *operator op(float *ptr,                          \
+                                          const Index<Value> &index) {         \
+    return ptr op index.value;                                                 \
+  }                                                                            \
+  /* Index + float* */                                                         \
+  template <int Value>                                                         \
+  constexpr __device__ float *operator op(const Index<Value> &index,           \
+                                          float *ptr) {                        \
+    return ptr op index.value;                                                 \
+  }                                                                            \
+  constexpr __device__ float *operator op(float *ptr, const IndexDyn &index) { \
+    return ptr op index.value;                                                 \
+  }                                                                            \
+  /* Index + float* */                                                         \
+  constexpr __device__ float *operator op(const IndexDyn &index, float *ptr) { \
+    return ptr op index.value;                                                 \
   }
 
 DEFINE_BINARY_OPERATOR_FOR_INDEX(+)
@@ -56,6 +88,9 @@ DEFINE_BINARY_OPERATOR_FOR_INDEX(-)
 DEFINE_BINARY_OPERATOR_FOR_INDEX(*)
 DEFINE_BINARY_OPERATOR_FOR_INDEX(/)
 DEFINE_BINARY_OPERATOR_FOR_INDEX(%)
+
+DEFINE_POINTER_OPERATOR_FOR_INDEX(+)
+DEFINE_POINTER_OPERATOR_FOR_INDEX(-)
 
 // define special ceil-div
 template <int Value, int OtherValue>

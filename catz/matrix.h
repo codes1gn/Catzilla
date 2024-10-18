@@ -20,33 +20,43 @@
 // TODO: rename to matrix.h
 namespace catz {
 
-// template <typename ShapeCoord, typename StrideCoord>
-// struct MatrixInfo {
-//     ShapeCoord shape;
-//     StrideCoord stride;
-//
-//     __device__ MatrixInfo(ShapeCoord s, StrideCoord st) : shape(s),
-//     stride(st) {}
-//
-//     constexpr auto rows() const {
-//     return shape.rows();
-//   }
-//
-//     void print_info() const {
-//         std::cout << "Matrix Shape: " << shape.str()
-//                   << ", Stride: " << stride.str() << std::endl;
-//     }
-// };
-//
-// template <typename ShapeCoord, typename StrideCoord>
-// constexpr __device__ auto make_matrix_info(ShapeCoord&& shape, StrideCoord&&
-// stride) {
-//     return MatrixInfo<std::decay_t<ShapeCoord>,
-//     std::decay_t<StrideCoord>>(shape, stride);
-// }
+// TODO: add conditional compilation. ShapeType should be CoordS
+template <typename T, typename ShapeType, typename StrideType>
+struct Matrix {
+  T *data;
+  ShapeType shape;
+  StrideType stride;
 
-// concept DataType = std::is_same_v<T, float> || std::is_same_v<T, half> ||
-// std::is_same_v<T, float4>;
+  constexpr __device__ Matrix(T *dt, ShapeType sp, StrideType st)
+      : data(dt), shape(sp), stride(st) {}
+
+  constexpr __device__ Matrix(const Matrix &other)
+      : data(other.data), shape(other.shape), stride(other.stride) {}
+
+  // move
+  constexpr __device__ Matrix(Matrix &&other) noexcept
+      : data(other.data), shape(other.shape), stride(other.stride) {
+    other.data = nullptr;
+  }
+
+  ///////////////////////////////////////////////////////////
+  /// dataflow related methods
+  ///////////////////////////////////////////////////////////
+
+  // TODO: make it device'd code
+  template <typename NewShapeType>
+  constexpr inline __device__ auto tile(const CoordDyn &tile_var,
+                                        const NewShapeType &new_shape) {
+    // auto new_data = data + tile_var.rows * new_shape.rows * stride.rows +
+    //               tile_var.cols * new_shape.cols * stride.cols;
+    auto new_data = data + tile_var.rows * new_shape.rows;
+    return Matrix<T, NewShapeType, StrideType>(new_data, new_shape, stride);
+  }
+};
+
+// #define make_matrix(DT, SP, ST) Matrix(DT, SP, ST)
+
+#define make_matrix(DT, SP) Matrix(DT, SP, make_coord(SP.cols(), 1))
 
 // convert multi-dim index to flatten-index
 // make it stream-style coding
@@ -112,7 +122,7 @@ struct MatrixNightly<T, Coord<ROWS, COLS>, Coord<STRD, 1>> {
     T *new_data = data + tile_var.rows * new_shape.rows * stride.rows +
                   tile_var.cols * new_shape.cols * stride.cols;
     MatrixNightly<T, Coord<NROWS, NCOLS>, Coord<STRD, 1>> ret =
-        make_matrix(new_data, new_shape, stride);
+        make_matrix_nightly(new_data, new_shape, stride);
     return std::move(ret);
   }
 
@@ -485,7 +495,7 @@ struct MatrixNightly<T, Coord<ROWS, COLS>, Coord<STRD, 1>> {
 // auto matrix = make_matrix(data, Coord<16, 32>(), Coord<32, 1>())
 template <typename T, typename CoordType, typename CoordType2>
 __device__ MatrixNightly<T, CoordType, CoordType2>
-make_matrix(T *data, CoordType shape, CoordType2 stride) {
+make_matrix_nightly(T *data, CoordType shape, CoordType2 stride) {
   return MatrixNightly<T, CoordType, CoordType2>(data, shape, stride);
 }
 
@@ -493,7 +503,7 @@ make_matrix(T *data, CoordType shape, CoordType2 stride) {
 // (T*, CoordType) -> Matrix
 template <typename T, int ROWS, int COLS>
 __device__ MatrixNightly<T, Coord<ROWS, COLS>, Coord<COLS, 1>>
-make_matrix(T *data, Coord<ROWS, COLS> shape) {
+make_matrix_nightly(T *data, Coord<ROWS, COLS> shape) {
   return MatrixNightly<T, Coord<ROWS, COLS>, Coord<COLS, 1>>(data, shape,
                                                              Coord<COLS, 1>());
 }
