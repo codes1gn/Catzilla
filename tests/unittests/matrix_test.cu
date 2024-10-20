@@ -10,13 +10,13 @@
 
 using namespace catz;
 
-
-TEST_CUDA_CASE(matrix_construction_1, "matrix construction full", "[matrix][construction]") {
+TEST_CUDA_CASE(matrix_construction_1, "matrix construction full",
+               "[matrix][construction]") {
   const int M_TILE = 32;
   const int K_TILE = 32;
   auto _shape = Coord<M_TILE, K_TILE>();
   auto _stride = Coord<K_TILE, 1>();
-  float lhs_data[M_TILE*K_TILE] = {0.0};
+  float lhs_data[M_TILE * K_TILE] = {0.0};
   auto lhs_mat = make_matrix_nightly(lhs_data, _shape, _stride);
 
   static_assert(lhs_mat.shape.rows == 32,
@@ -30,11 +30,12 @@ TEST_CUDA_CASE(matrix_construction_1, "matrix construction full", "[matrix][cons
                 "matrix.stride.rows not available at compile-time");
 }
 
-TEST_CUDA_CASE(matrix_construction_2, "matrix construction contiguous", "[matrix][construction]") {
+TEST_CUDA_CASE(matrix_construction_2, "matrix construction contiguous",
+               "[matrix][construction]") {
   const int M_TILE = 26;
   const int K_TILE = 32;
   auto _shape = Coord<M_TILE, K_TILE>();
-  float lhs_data[M_TILE*K_TILE] = {0.0};
+  float lhs_data[M_TILE * K_TILE] = {0.0};
   auto lhs_mat = make_matrix_nightly(lhs_data, _shape);
 
   static_assert(lhs_mat.shape.rows == 26,
@@ -55,7 +56,7 @@ TEST_CASE("matrix tile contiguous legacy", "[matrix][tile][legacy]") {
   const int M_REG = 13;
   const int K_REG = 4;
   auto _shape = CoordDyn(M_TILE, K_TILE);
-  float lhs_data[M_TILE*K_TILE] = {0.0};
+  float lhs_data[M_TILE * K_TILE] = {0.0};
   auto lhs_mat = MatrixDyn(lhs_data, _shape);
   auto _tile_shape = CoordDyn(M_REG, K_REG);
   auto rhs_mat = lhs_mat.tile(CoordDyn(0, 0), _tile_shape);
@@ -67,12 +68,13 @@ TEST_CASE("matrix tile contiguous legacy", "[matrix][tile][legacy]") {
   CHECK_FALSE(rhs_mat.stride.cols == 2);
 }
 
-TEST_CUDA_CASE(matrix_tile_contiguous, "matrix tile contiguous", "[matrix][tile]") {
+TEST_CUDA_CASE(matrix_tile_contiguous, "matrix tile contiguous",
+               "[matrix][tile]") {
   const int M_TILE = 26;
   const int K_TILE = 32;
   const int M_REG = 13;
   const int K_REG = 4;
-  float lhs_data[M_TILE*K_TILE] = {0.0};
+  float lhs_data[M_TILE * K_TILE] = {0.0};
   auto _shape = Coord<M_TILE, K_TILE>();
 
   auto lhs_mat = make_matrix_nightly(lhs_data, _shape);
@@ -90,7 +92,7 @@ TEST_CUDA_CASE(matrix_dist_to_coord, "matrix dist to coord", "[matrix][dist]") {
   const int K_TILE = 32;
   const int M_REG = 13;
   const int K_REG = 4;
-  float lhs_data[M_TILE*K_TILE] = {0.0};
+  float lhs_data[M_TILE * K_TILE] = {0.0};
   auto _shape = Coord<M_TILE, K_TILE>();
 
   auto lhs_mat = make_matrix_nightly(lhs_data, _shape);
@@ -105,13 +107,13 @@ TEST_CUDA_CASE(matrix_dist_to_coord, "matrix dist to coord", "[matrix][dist]") {
   SCHECK(rhs_mat.stride.rows == 32);
   SCHECK(rhs_mat.stride.cols == 1);
   // TODO: assert at device not caught by CATCH2, need fix
-  assert(rhs_mat.data[0] == 0.13);
-  assert(rhs_mat.data[3] == 0.13);
-  assert(rhs_mat.data[4] == 0.13);
+  assert(rhs_mat.data[0] == 0.13f);
+  assert(rhs_mat.data[3] == 0.13f);
+  assert(rhs_mat.data[4] == 0.13f);
 }
 
 TEST_CUDA_CASE(matrix_create, "matrix create", "[matrix][create]") {
-  int data[12] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+  float data[12];
   auto shape = make_coord(3, 4);
   auto matrix = make_matrix(data, shape);
 
@@ -122,12 +124,24 @@ TEST_CUDA_CASE(matrix_create, "matrix create", "[matrix][create]") {
   SCHECK(matrix.stride.isStatic() == true);
 }
 
+TEST_CUDA_CASE(matrix_create_dyn, "matrix create dyn", "[matrix][create]") {
+  float data[12];
+  auto shape = make_coord_dyn(3, 4);
+  auto matrix = make_matrix(data, shape);
+
+  assert(shape.rows() == 3);
+  assert(matrix.shape.rows() == 3);
+  assert(matrix.stride.rows() == 4);
+  SCHECK(matrix.shape.isStatic() == false);
+  SCHECK(matrix.stride.isStatic() == false);
+}
+
 TEST_CASE("matrix tile", "[matrix][tile]") {
   const int M_TILE = 26;
   const int K_TILE = 32;
   const int M_REG = 13;
   const int K_REG = 4;
-  float lhs_data[M_TILE*K_TILE] = {0.0};
+  float lhs_data[M_TILE * K_TILE] = {0.0};
   auto _shape = make_coord(26, 32);
   auto _tile_shape = make_coord(13, 4);
   auto _mat = make_matrix(lhs_data, _shape);
@@ -145,11 +159,78 @@ TEST_CUDA_CASE(matrix_tile, "matrix tile cuda", "[matrix][tile]") {
   const int K_TILE = 32;
   const int M_REG = 13;
   const int K_REG = 4;
-  float lhs_data[M_TILE*K_TILE] = {0.0};
+  float lhs_data[M_TILE * K_TILE] = {0.0};
   auto _shape = make_coord(26, 32);
   auto _tile_shape = make_coord(13, 4);
   auto _mat = make_matrix(lhs_data, _shape);
   auto _tiled_mat = _mat.tile(CoordDyn(3, 0), _tile_shape);
+
+  SCHECK(_tiled_mat.shape.rows() == 13);
+  SCHECK(_tiled_mat.shape.cols() == 4);
+  SCHECK(_tiled_mat.stride.rows() == 32);
+  SCHECK(_tiled_mat.stride.cols() == 1);
+  SCHECK_FALSE(_tiled_mat.stride.cols() == 2);
+}
+
+TEST_CASE("matrix dist", "[matrix][dist]") {
+  const int M_TILE = 26;
+  const int K_TILE = 32;
+  const int M_REG = 13;
+  const int K_REG = 4;
+  float lhs_data[M_TILE * K_TILE] = {0.0};
+  auto _shape = make_coord(26, 32);
+  auto _tile_shape = make_coord(13, 4);
+  auto _mat = make_matrix(lhs_data, _shape);
+  auto _tiled_mat = _mat.tile(CoordDyn(0, 0), _tile_shape);
+  for (int i = 0; i < 13; i++)
+    for (int j = 0; j < 4; j++)
+      _tiled_mat.dist_to(CoordDyn(i, j)) = 0.131;
+
+  SCHECK(_tiled_mat.shape.rows() == 13);
+  SCHECK(_tiled_mat.shape.cols() == 4);
+  SCHECK(_tiled_mat.stride.rows() == 32);
+  SCHECK(_tiled_mat.stride.cols() == 1);
+  SCHECK_FALSE(_tiled_mat.stride.cols() == 2);
+
+  CHECK(_tiled_mat.data[0] == 0.131f);
+  CHECK(_tiled_mat.data[3] == 0.131f);
+  CHECK(_tiled_mat.data[32] == 0.131f);
+}
+
+TEST_CUDA_CASE(matrix_dist, "matrix dist cuda", "[matrix][dist]") {
+  const int M_TILE = 26;
+  const int K_TILE = 32;
+  const int M_REG = 13;
+  const int K_REG = 4;
+  float lhs_data[M_TILE * K_TILE] = {0.0};
+  auto _shape = make_coord(26, 32);
+  auto _tile_shape = make_coord(13, 4);
+  auto _mat = make_matrix(lhs_data, _shape);
+  auto _tiled_mat = _mat.tile(CoordDyn(3, 0), _tile_shape);
+  for (int i = 0; i < 13; i++)
+    for (int j = 0; j < 4; j++)
+      _tiled_mat.dist_to(CoordDyn(i, j)) = 0.131;
+
+  SCHECK(_tiled_mat.shape.rows() == 13);
+  SCHECK(_tiled_mat.shape.cols() == 4);
+  SCHECK(_tiled_mat.stride.rows() == 32);
+  SCHECK(_tiled_mat.stride.cols() == 1);
+  SCHECK_FALSE(_tiled_mat.stride.cols() == 2);
+}
+
+TEST_CUDA_CASE_WITH_THREADS(matrix_dist_to_threadx, 4,
+                            "matrix dist cuda threadx", "[matrix][dist]") {
+  const int M_TILE = 26;
+  const int K_TILE = 32;
+  const int M_REG = 13;
+  const int K_REG = 4;
+  float lhs_data[M_TILE * K_TILE] = {0.0};
+  auto _shape = make_coord(26, 32);
+  auto _tile_shape = make_coord(13, 4);
+  auto _mat = make_matrix(lhs_data, _shape);
+  auto _tiled_mat = _mat.tile(CoordDyn(3, 0), _tile_shape);
+  for (int i = 0; i < 13; i++)
+    _tiled_mat.dist_to(CoordDyn(i, threadIdx.x)) = 0.131;
 
   SCHECK(_tiled_mat.shape.rows() == 13);
   SCHECK(_tiled_mat.shape.cols() == 4);
