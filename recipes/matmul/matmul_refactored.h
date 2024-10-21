@@ -237,13 +237,15 @@ __global__ void _matmul_stream_api_tuned(int M, int N, int K, float alpha,
   auto out_mat = make_matrix(out, out_shape);
 
   auto lhs_shared_mat = make_shared_matrix(lhs_sm_tile_shape);
-  // auto rhs_shared_mat = make_shared<K_TILE, N_TILE, float>();
+  // auto rhs_shared_mat = make_shared_matrix(rhs_sm_tile_shape);
   // MatrixDyn<float> out_shared_mat = make_shared<M_TILE_SM, N_TILE_SM>();
   //
   //
-  //   MatrixDyn<float> partial_sum =
-  //       make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD),
-  //                  float>();
+  // MatrixDyn<float> partial_sum =
+  //     make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD),
+  //                float>();
+  // auto partial_sum = make_local_matrix(out_sm_tile_shape /
+  // per_block_data_shape);
   //
   //   // int threadId = threadIdx.y * X_THREAD + threadIdx.x;
   //

@@ -4,7 +4,7 @@
 namespace catz {
 
 // KERNEL UTILS
-#define CEIL_DIV(dividend, divisor) (((dividend) + (divisor) - 1) / (divisor))
+#define CEIL_DIV(dividend, divisor) (((dividend) + (divisor)-1) / (divisor))
 
 #define MAKE_SHARED(matrixVar, size, type)                                     \
   __shared__ type matrixVar##_data[size];                                      \
@@ -12,6 +12,7 @@ namespace catz {
       MatrixDyn<type>(matrixVar##_data, CoordDyn(1, size))
 
 // TODO: impl volume
+// TODO: Matrix own.
 #define make_shared_matrix(matrixVar, shape, type)                             \
   __shared__ type matrixVar##_data[shape.volume()];                            \
   auto matrixVar = make_matrix(matrixVar##_data, shape)
@@ -21,6 +22,7 @@ namespace catz {
   MatrixDyn<type> matrixVar =                                                  \
       MatrixDyn<type>(matrixVar##_data, CoordDyn(size_x, size_y))
 
+// TODO: consider to mute
 #define make_shared_matrix(matrixVar, size_x, size_y, type)                    \
   __shared__ type matrixVar##_data[size_x * size_y];                           \
   auto matrixVar = make_matrix(matrixVar##_data, make_coord_dyn(size_x, size_y))
