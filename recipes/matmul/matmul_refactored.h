@@ -249,7 +249,7 @@ __global__ void _matmul_stream_api_tuned(int M, int N, int K, float alpha,
   auto out_sm_tile_shape_old = CoordDyn(M_TILE, N_TILE);
 
   // make sure inner block looks like this, to ensure coalescing
-  auto per_block_data_shape_old = CoordDyn(Y_THREAD, X_THREAD);
+  // auto per_block_data_shape_old = CoordDyn(Y_THREAD, X_THREAD);
 
   // MatrixDyn<float> lhs_mat = MatrixDyn<float>(lhs, lhs_shape);
   // MatrixDyn<float> rhs_mat = MatrixDyn<float>(rhs, rhs_shape);
@@ -260,63 +260,11 @@ __global__ void _matmul_stream_api_tuned(int M, int N, int K, float alpha,
   // MatrixDyn<float> partial_sum =
   //     make_local<CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD),
   //                float>();
-  // auto partial_sum =
-  //     make_local_test<float>(make_coord(CEIL_DIV(M_TILE, Y_THREAD),
-  //     CEIL_DIV(N_TILE, X_THREAD)));
-  // MAKE_LOCAL_MATRIX(partial_sum, make_coord(CEIL_DIV(M_TILE, Y_THREAD),
-  // CEIL_DIV(N_TILE, X_THREAD)), float);
-  //
+
   auto partial_sum_shape =
       make_coord(CEIL_DIV(M_TILE, Y_THREAD), CEIL_DIV(N_TILE, X_THREAD));
-  float partial_sum_data[partial_sum_shape.volume()];
-  auto partial_sum = make_matrix(partial_sum_data, partial_sum_shape);
-  //   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
-  //     for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
-  // #pragma unroll
-  //       for (int kin = 0; kin < CEIL_DIV(K_TILE, X_THREAD); kin++) {
-  //         lhs_shared_mat.tile(CoordS(IndexDyn(m), IndexDyn(kin)),
-  //         per_block_data_shape)
-  //             .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)))
-  //             = lhs_mat.tile(CoordS(IndexDyn(blockIdx.y), IndexDyn(ko)),
-  //             lhs_sm_tile_shape)
-  //                   .tile(CoordS(IndexDyn(m), IndexDyn(kin)),
-  //                   per_block_data_shape)
-  //                   .dist_to(CoordS(IndexDyn(threadIdx.y),
-  //                   IndexDyn(threadIdx.x)));
-  //       }
-  //     }
-  //     for (int kin = 0; kin < CEIL_DIV(K_TILE, Y_THREAD); kin++) {
-  // #pragma unroll
-  //       for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-  //         rhs_shared_mat.tile(CoordS(IndexDyn(kin), IndexDyn(n)),
-  //         per_block_data_shape)
-  //             .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)))
-  //             = rhs_mat.tile(CoordS(IndexDyn(ko), IndexDyn(blockIdx.x)),
-  //             rhs_sm_tile_shape)
-  //                 .tile(CoordS(IndexDyn(kin), IndexDyn(n)),
-  //                 per_block_data_shape)
-  //                 .dist_to(CoordS(IndexDyn(threadIdx.y),
-  //                 IndexDyn(threadIdx.x)));
-  //       }
-  //     }
-  //     __syncthreads();
-  //
-  //     // contract at 128x128x32 micro-kernel
-  //     matmul_kernel_coalesced<M_TILE, N_TILE, K_TILE, Y_THREAD, X_THREAD>(
-  //         lhs_shared_mat.data, rhs_shared_mat.data, partial_sum.data);
-  //   }
-  //   __syncthreads();
-  //
-  //   for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
-  // #pragma unroll
-  //     for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-  //       out_mat.tile(CoordS(IndexDyn(blockIdx.y), IndexDyn(blockIdx.x)),
-  //       out_sm_tile_shape)
-  //           .tile(CoordS(IndexDyn(m), IndexDyn(n)), per_block_data_shape)
-  //           .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x))) =
-  //           partial_sum.dist_to(CoordS(IndexDyn(m), IndexDyn(n)));
-  //     }
-  //   }
+  MAKE_LOCAL_MATRIX(partial_sum, partial_sum_shape, float);
+
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
     for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
 #pragma unroll

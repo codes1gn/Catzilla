@@ -18,7 +18,7 @@ namespace catz {
   auto matrixVar = make_matrix(matrixVar##_data, shape)
 
 #define MAKE_LOCAL_MATRIX(matrixVar, shape, type)                              \
-  type matrixVar##_data[(shape).volume()];                                     \
+  type matrixVar##_data[(shape).volume()] = {0.};                              \
   auto matrixVar = make_matrix(matrixVar##_data, shape)
 
 #define MAKE_SHARED(matrixVar, size_x, size_y, type)                           \

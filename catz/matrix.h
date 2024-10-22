@@ -1252,10 +1252,10 @@ __device__ MatrixDyn<T> make_local() {
 }
 
 template <typename T, typename ShapeType>
-__device__ auto make_local_test(const ShapeType &shape) {
+__device__ auto make_local_test(const ShapeType &&shape) {
   static_assert(is_allowed_type<T>::value,
                 "T must be one of the allowed types: float, half, or float4.");
-  T _data[shape.volume()];
+  T _data[shape.volume()] = {0.};
   return make_matrix(_data, shape);
 }
 
