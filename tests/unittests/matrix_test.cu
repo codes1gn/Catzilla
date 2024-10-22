@@ -181,10 +181,10 @@ TEST_CASE("matrix dist", "[matrix][dist]") {
   auto _shape = make_coord(26, 32);
   auto _tile_shape = make_coord(13, 4);
   auto _mat = make_matrix(lhs_data, _shape);
-  auto _tiled_mat = _mat.tile(CoordDyn(0, 0), _tile_shape);
+  auto _tiled_mat = _mat.tile(make_coord_dyn(0, 0), _tile_shape);
   for (int i = 0; i < 13; i++)
     for (int j = 0; j < 4; j++)
-      _tiled_mat.dist_to(CoordDyn(i, j)) = 0.131;
+      _tiled_mat.dist_to(make_coord_dyn(i, j)) = 0.131;
 
   SCHECK(_tiled_mat.shape.rows() == 13);
   SCHECK(_tiled_mat.shape.cols() == 4);
@@ -206,10 +206,10 @@ TEST_CUDA_CASE(matrix_dist, "matrix dist cuda", "[matrix][dist]") {
   auto _shape = make_coord(26, 32);
   auto _tile_shape = make_coord(13, 4);
   auto _mat = make_matrix(lhs_data, _shape);
-  auto _tiled_mat = _mat.tile(CoordDyn(3, 0), _tile_shape);
+  auto _tiled_mat = _mat.tile(make_coord_dyn(3, 0), _tile_shape);
   for (int i = 0; i < 13; i++)
     for (int j = 0; j < 4; j++)
-      _tiled_mat.dist_to(CoordDyn(i, j)) = 0.131;
+      _tiled_mat.dist_to(make_coord_dyn(i, j)) = 0.131;
 
   SCHECK(_tiled_mat.shape.rows() == 13);
   SCHECK(_tiled_mat.shape.cols() == 4);
@@ -228,9 +228,9 @@ TEST_CUDA_CASE_WITH_THREADS(matrix_dist_to_threadx, 4,
   auto _shape = make_coord(26, 32);
   auto _tile_shape = make_coord(13, 4);
   auto _mat = make_matrix(lhs_data, _shape);
-  auto _tiled_mat = _mat.tile(CoordDyn(3, 0), _tile_shape);
+  auto _tiled_mat = _mat.tile(make_coord_dyn(3, 0), _tile_shape);
   for (int i = 0; i < 13; i++)
-    _tiled_mat.dist_to(CoordDyn(i, threadIdx.x)) = 0.131;
+    _tiled_mat.dist_to(make_coord_dyn(i, threadIdx.x)) = 0.131;
 
   SCHECK(_tiled_mat.shape.rows() == 13);
   SCHECK(_tiled_mat.shape.cols() == 4);

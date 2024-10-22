@@ -46,15 +46,16 @@ struct Matrix {
   ///////////////////////////////////////////////////////////
 
   // TODO: make it device'd code
-  template <typename NewShapeType>
-  constexpr inline __device__ auto tile(const CoordDyn &tile_var,
+  template <typename TileVarType, typename NewShapeType>
+  constexpr inline __device__ auto tile(const TileVarType &tile_var,
                                         const NewShapeType &new_shape) {
     auto new_data = data + tile_var.rows * new_shape.rows * stride.rows +
                     tile_var.cols * new_shape.cols * stride.cols;
     return Matrix<T, NewShapeType, StrideType>(new_data, new_shape, stride);
   }
 
-  constexpr inline __device__ auto dist_to(const CoordDyn &tile_var) {
+  template <typename TileVarType>
+  constexpr inline __device__ auto dist_to(const TileVarType &tile_var) {
     // shape = 8 x 2
     // y in 0-4, x in 0-4
     auto new_data =
@@ -349,11 +350,40 @@ struct Matrix {
                                   row_other * other.stride.rows + col_other]);
     }
   }
+
+  ///////////////////////////////////////////////////////////
+  /// utils methods
+  ///////////////////////////////////////////////////////////
+
+  inline __device__ void fill(T value) {
+    auto flat_id = IndexDyn(threadIdx.y * blockDim.x + threadIdx.x);
+    auto row_in_current = flat_id / shape.cols;
+    auto col_in_current = flat_id % shape.cols;
+    auto elements = shape.rows * shape.cols;
+    auto threads = IndexDyn(blockDim.x * blockDim.y);
+    for (int chunk = 0; chunk < CEIL_DIV(elements.value, threads.value);
+         chunk++) {
+      data[chunk * threads + flat_id] = value;
+    }
+  }
+
+  template <typename U = T>
+  constexpr inline __device__
+      typename std::enable_if<std::is_same<U, float>::value, void>::type
+      print() const {
+    for (size_t i = 0; i < shape.rows; ++i) {
+      for (size_t j = 0; j < shape.cols; ++j) {
+        std::cout << data[i * shape.rows + j * shape.cols] << " ";
+      }
+      std::cout << "\n";
+    }
+    std::cout << std::endl;
+  }
 };
 
 // #define make_matrix(DT, SP, ST) Matrix(DT, SP, ST)
 
-#define make_matrix(DT, SP) Matrix(DT, SP, CoordS(SP.cols, I1()))
+#define make_matrix(DT, SP) Matrix(DT, SP, CoordS((SP).cols, I1()))
 
 // convert multi-dim index to flatten-index
 // make it stream-style coding
@@ -1202,6 +1232,16 @@ __device__ MatrixDyn<T> make_shared() {
   return MatrixDyn<T>(std::move(_data), CoordDyn(x, y));
 }
 
+// template <typename T, typename RowType, typename ColType>
+// __device__ auto make_shared_test(const CoordS<RowType, ColType>& shape) {
+//   static_assert(is_allowed_type<T>::value,
+//                 "T must be one of the allowed types: float, half, or
+//                 float4.");
+//
+//   __shared__ T _data[shape.volume()];
+//   return make_matrix(std::move(_data), shape);
+// }
+
 template <int x, int y, typename T>
 __device__ MatrixDyn<T> make_local() {
   static_assert(is_allowed_type<T>::value,
@@ -1209,6 +1249,14 @@ __device__ MatrixDyn<T> make_local() {
   float _data[x * y] = {0.};
   // extern __shared__ float _data[];
   return MatrixDyn<T>(_data, CoordDyn(x, y));
+}
+
+template <typename T, typename ShapeType>
+__device__ auto make_local_test(const ShapeType &shape) {
+  static_assert(is_allowed_type<T>::value,
+                "T must be one of the allowed types: float, half, or float4.");
+  T _data[shape.volume()];
+  return make_matrix(_data, shape);
 }
 
 __device__ __forceinline__ int xor_swizzle(int o) {

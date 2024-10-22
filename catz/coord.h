@@ -28,6 +28,8 @@ struct CoordS {
 
   constexpr bool isStatic() { return (rows.isStatic() && cols.isStatic()); }
 
+  constexpr auto volume() const { return rows() * cols(); }
+
   DEFINE_BINARY_OPERATOR_FOR_COORD(+)
   DEFINE_BINARY_OPERATOR_FOR_COORD(-)
   DEFINE_BINARY_OPERATOR_FOR_COORD(*)

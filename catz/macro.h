@@ -13,8 +13,12 @@ namespace catz {
 
 // TODO: impl volume
 // TODO: Matrix own.
-#define make_shared_matrix(matrixVar, shape, type)                             \
-  __shared__ type matrixVar##_data[shape.volume()];                            \
+#define MAKE_SHARED_MATRIX(matrixVar, shape, type)                             \
+  __shared__ type matrixVar##_data[(shape).volume()];                          \
+  auto matrixVar = make_matrix(matrixVar##_data, shape)
+
+#define MAKE_LOCAL_MATRIX(matrixVar, shape, type)                              \
+  type matrixVar##_data[(shape).volume()];                                     \
   auto matrixVar = make_matrix(matrixVar##_data, shape)
 
 #define MAKE_SHARED(matrixVar, size_x, size_y, type)                           \
