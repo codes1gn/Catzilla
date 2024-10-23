@@ -7,6 +7,7 @@
 #include <cuda_runtime.h>
 
 #include "coord.h"
+#include "index.h"
 #include "macro.h"
 #include "matrix.h"
 #include "ukernels.h"
@@ -300,20 +301,21 @@ __global__ void _matmul_stream_api_tuned(int M, int N, int K, float alpha,
   }
   __syncthreads();
 
-  for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
+  for (auto m = IndexDyn(0); m < make_index<CEIL_DIV(M_TILE, Y_THREAD)>();
+       ++m) {
 #pragma unroll
     for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
       out_mat
           .tile(CoordS(IndexDyn(blockIdx.y), IndexDyn(blockIdx.x)),
                 out_sm_tile_shape)
-          .tile(CoordS(IndexDyn(m), IndexDyn(n)), per_block_data_shape)
+          .tile(CoordS(m, IndexDyn(n)), per_block_data_shape)
           .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)))
           //     partial_sum.dist_to(CoordS(IndexDyn(m), IndexDyn(n)));
           // out_mat.tile(CoordDyn(blockIdx.y, blockIdx.x),
           // out_sm_tile_shape_old)
           //     .tile(CoordDyn(m, n), per_block_data_shape_old)
           //     .dist_to(CoordDyn(threadIdx.y, threadIdx.x))
-          = partial_sum.data[m * CEIL_DIV(M_TILE, Y_THREAD) + n];
+          = partial_sum.data[m.value * CEIL_DIV(M_TILE, Y_THREAD) + n];
       // = partial_sum.dist_to(CoordDyn(m, n));
     }
   }

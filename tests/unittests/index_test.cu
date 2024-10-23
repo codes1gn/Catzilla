@@ -87,3 +87,14 @@ TEST_CASE("index mod", "[index][mod]") {
   CHECK(res_dyn.value == 1);
 }
 
+TEST_CASE("index self-increment", "[index][self-increment]") {
+  auto idx1 = make_index<10>();  // 编译期常量
+  auto idx2 = ++idx1;
+  SCHECK(idx1.value == 10);
+  SCHECK(idx2.value == 11);
+
+  auto idx1_dyn = make_index(10);  // 编译期常量
+  ++idx1_dyn;
+  CHECK(idx1_dyn.value == 11);
+}
+
