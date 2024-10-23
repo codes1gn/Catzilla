@@ -10,10 +10,11 @@
 *. legacy tests for tile
 *. test static tile in catch2, as __device__ func
 *. config CATCH2 and add test for constexpr design
+*. make all correct first, and impose user's behaviour is allowed. no need to force unified helpers
 
 ======================= TODO ==============================
 
-*. make all correct first, and impose user's behaviour is allowed. no need to force unified helpers
+*. refactor all cases before porting
 *. integrate to choreo
 
 *. use compile-time value for Matrix design, like nalgebra | if problem comes from threadIdx.y these runtime value, try to add const value into API for (loop-extents)

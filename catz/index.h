@@ -157,6 +157,7 @@ constexpr auto make_index(int value) {
 ///
 
 #define DEFINE_INDEX(n) using I##n = Index<n>;
+using I = IndexDyn;
 
 // 展开所有 2 的幂次别名，从 1 到 1024
 DEFINE_INDEX(0)
