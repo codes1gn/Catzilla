@@ -7,9 +7,11 @@
 #include <cuda_runtime.h>
 
 #include "coord.h"
+#include "coord_legacy.h"
 #include "index.h"
 #include "macro.h"
 #include "matrix.h"
+#include "matrix_legacy.h"
 #include "ukernels.h"
 
 using namespace catz;
@@ -55,22 +57,22 @@ __global__ void _matmul_pad_swizzled(int M, int N, int K, float alpha,
 #pragma unroll
       for (auto kin = I(0); kin < make_index<CEIL_DIV(K_TILE, X_THREAD)>();
            ++kin) {
-        lhs_shared_mat.tile(CoordS(m, kin), per_block_data_shape)
-            .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x))) =
-            lhs_mat.tile(CoordS(IndexDyn(blockIdx.y), ko), lhs_sm_tile_shape)
-                .tile(CoordS(m, kin), per_block_data_shape)
-                .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
+        lhs_shared_mat.tile(Coord(m, kin), per_block_data_shape)
+            .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x))) =
+            lhs_mat.tile(Coord(IndexDyn(blockIdx.y), ko), lhs_sm_tile_shape)
+                .tile(Coord(m, kin), per_block_data_shape)
+                .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
       }
     }
     for (auto kin = I(0); kin < make_index<CEIL_DIV(K_TILE, Y_THREAD)>();
          ++kin) {
 #pragma unroll
       for (auto n = I(0); n < make_index<CEIL_DIV(N_TILE, X_THREAD)>(); ++n) {
-        rhs_shared_mat.tile(CoordS(kin, n), per_block_data_shape)
-            .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x))) =
-            rhs_mat.tile(CoordS(ko, IndexDyn(blockIdx.x)), rhs_sm_tile_shape)
-                .tile(CoordS(kin, n), per_block_data_shape)
-                .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
+        rhs_shared_mat.tile(Coord(kin, n), per_block_data_shape)
+            .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x))) =
+            rhs_mat.tile(Coord(ko, IndexDyn(blockIdx.x)), rhs_sm_tile_shape)
+                .tile(Coord(kin, n), per_block_data_shape)
+                .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
       }
     }
     __syncthreads();
@@ -85,11 +87,11 @@ __global__ void _matmul_pad_swizzled(int M, int N, int K, float alpha,
 #pragma unroll
     for (auto n = I(0); n < make_index<CEIL_DIV(N_TILE, X_THREAD)>(); ++n) {
       out_mat
-          .tile(CoordS(IndexDyn(blockIdx.y), IndexDyn(blockIdx.x)),
+          .tile(Coord(IndexDyn(blockIdx.y), IndexDyn(blockIdx.x)),
                 out_sm_tile_shape)
-          .tile(CoordS(m, n), per_block_data_shape)
-          .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x))) =
-          partial_sum.dist_to(CoordS(m, n));
+          .tile(Coord(m, n), per_block_data_shape)
+          .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x))) =
+          partial_sum.dist_to(Coord(m, n));
     }
   }
 }

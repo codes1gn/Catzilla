@@ -6,7 +6,10 @@
 #include <cuda_runtime.h>
 
 #include "macro.h"
+#include "coord.h"
+#include "coord_legacy.h"
 #include "matrix.h"
+#include "matrix_legacy.h"
 
 using namespace catz;
 
@@ -14,8 +17,8 @@ TEST_CUDA_CASE(matrix_construction_1, "matrix construction full",
                "[matrix][construction]") {
   const int M_TILE = 32;
   const int K_TILE = 32;
-  auto _shape = Coord<M_TILE, K_TILE>();
-  auto _stride = Coord<K_TILE, 1>();
+  auto _shape = CoordSt<M_TILE, K_TILE>();
+  auto _stride = CoordSt<K_TILE, 1>();
   float lhs_data[M_TILE * K_TILE] = {0.0};
   auto lhs_mat = make_matrix_nightly(lhs_data, _shape, _stride);
 
@@ -34,7 +37,7 @@ TEST_CUDA_CASE(matrix_construction_2, "matrix construction contiguous",
                "[matrix][construction]") {
   const int M_TILE = 26;
   const int K_TILE = 32;
-  auto _shape = Coord<M_TILE, K_TILE>();
+  auto _shape = CoordSt<M_TILE, K_TILE>();
   float lhs_data[M_TILE * K_TILE] = {0.0};
   auto lhs_mat = make_matrix_nightly(lhs_data, _shape);
 
@@ -75,10 +78,10 @@ TEST_CUDA_CASE(matrix_tile_contiguous, "matrix tile contiguous",
   const int M_REG = 13;
   const int K_REG = 4;
   float lhs_data[M_TILE * K_TILE] = {0.0};
-  auto _shape = Coord<M_TILE, K_TILE>();
+  auto _shape = CoordSt<M_TILE, K_TILE>();
 
   auto lhs_mat = make_matrix_nightly(lhs_data, _shape);
-  auto _tile_shape = Coord<M_REG, K_REG>();
+  auto _tile_shape = CoordSt<M_REG, K_REG>();
   auto rhs_mat = lhs_mat.tile(CoordDyn(0, 0), _tile_shape);
 
   SCHECK(rhs_mat.shape.rows == 13);
@@ -93,10 +96,10 @@ TEST_CUDA_CASE(matrix_dist_to_coord, "matrix dist to coord", "[matrix][dist]") {
   const int M_REG = 13;
   const int K_REG = 4;
   float lhs_data[M_TILE * K_TILE] = {0.0};
-  auto _shape = Coord<M_TILE, K_TILE>();
+  auto _shape = CoordSt<M_TILE, K_TILE>();
 
   auto lhs_mat = make_matrix_nightly(lhs_data, _shape);
-  auto _tile_shape = Coord<M_REG, K_REG>();
+  auto _tile_shape = CoordSt<M_REG, K_REG>();
   auto rhs_mat = lhs_mat.tile(CoordDyn(0, 0), _tile_shape);
   for (int row = 0; row < M_REG; row++)
     for (int col = 0; col < K_REG; col++)

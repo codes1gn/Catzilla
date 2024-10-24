@@ -7,7 +7,10 @@
 #include <cuda_runtime.h>
 
 #include "macro.h"
+#include "coord.h"
+#include "coord_legacy.h"
 #include "matrix.h"
+#include "matrix_legacy.h"
 
 using namespace catz;
 
@@ -57,20 +60,20 @@ TEST_CUDA_CASE(kernel_smoke_test, "kernel_smoke_test", "[kernel][smoke]") {
   for (int ko = 0; ko < CEIL_DIV(K, K_TILE); ko++) {
     for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
       for (int kin = 0; kin < CEIL_DIV(K_TILE, X_THREAD); kin++) {
-        lhs_shared_mat.tile(CoordS(IndexDyn(m), IndexDyn(kin)), per_block_data_shape)
-          .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)))
-          = lhs_mat.tile(CoordS(IndexDyn(blockIdx.y), IndexDyn(ko)), lhs_sm_tile_shape)
-          .tile(CoordS(IndexDyn(m), IndexDyn(kin)), per_block_data_shape)
-          .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
+        lhs_shared_mat.tile(Coord(IndexDyn(m), IndexDyn(kin)), per_block_data_shape)
+          .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)))
+          = lhs_mat.tile(Coord(IndexDyn(blockIdx.y), IndexDyn(ko)), lhs_sm_tile_shape)
+          .tile(Coord(IndexDyn(m), IndexDyn(kin)), per_block_data_shape)
+          .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
       }
     }
     for (int kin = 0; kin < CEIL_DIV(K_TILE, Y_THREAD); kin++) {
       for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-        rhs_shared_mat.tile(CoordS(IndexDyn(kin), IndexDyn(n)), per_block_data_shape)
-          .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x))) =
-          rhs_mat.tile(CoordS(IndexDyn(ko), IndexDyn(blockIdx.x)), rhs_sm_tile_shape)
-          .tile(CoordS(IndexDyn(kin), IndexDyn(n)), per_block_data_shape)
-          .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
+        rhs_shared_mat.tile(Coord(IndexDyn(kin), IndexDyn(n)), per_block_data_shape)
+          .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x))) =
+          rhs_mat.tile(Coord(IndexDyn(ko), IndexDyn(blockIdx.x)), rhs_sm_tile_shape)
+          .tile(Coord(IndexDyn(kin), IndexDyn(n)), per_block_data_shape)
+          .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
       }
     }
     __syncthreads();
@@ -83,10 +86,10 @@ TEST_CUDA_CASE(kernel_smoke_test, "kernel_smoke_test", "[kernel][smoke]") {
 
   for (int m = 0; m < CEIL_DIV(M_TILE, Y_THREAD); m++) {
     for (int n = 0; n < CEIL_DIV(N_TILE, X_THREAD); n++) {
-      out_mat.tile(CoordS(IndexDyn(blockIdx.y), IndexDyn(blockIdx.x)), out_sm_tile_shape)
-          .tile(CoordS(IndexDyn(m), IndexDyn(n)), per_block_data_shape)
-          .dist_to(CoordS(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)))
-          = partial_sum.dist_to(CoordS(IndexDyn(m), IndexDyn(n)));
+      out_mat.tile(Coord(IndexDyn(blockIdx.y), IndexDyn(blockIdx.x)), out_sm_tile_shape)
+          .tile(Coord(IndexDyn(m), IndexDyn(n)), per_block_data_shape)
+          .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)))
+          = partial_sum.dist_to(Coord(IndexDyn(m), IndexDyn(n)));
     }
   }
 }

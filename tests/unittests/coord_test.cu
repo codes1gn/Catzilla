@@ -5,7 +5,10 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
+#include "coord.h"
+#include "coord_legacy.h"
 #include "matrix.h"
+#include "matrix_legacy.h"
 #include "macro.h"
 
 using namespace catz;
@@ -13,13 +16,13 @@ using namespace catz;
 TEST_CASE("coord construction", "[coord][construction]") {
   auto r = make_index<2>();
   auto c = make_index<3>();
-  auto static_coord = CoordS(r, c);
+  auto static_coord = Coord(r, c);
   SCHECK(static_coord.rows() == 2);
   SCHECK(static_coord.cols() == 3);
 
   auto r_dyn = make_index(5);
   auto c_dyn = make_index(6);
-  auto dynamic_coord = CoordS(r_dyn, c_dyn);  // 使用运行时变量
+  auto dynamic_coord = Coord(r_dyn, c_dyn);  // 使用运行时变量
   CHECK(dynamic_coord.rows() == 5);
   CHECK(dynamic_coord.cols() == 6);
 }
