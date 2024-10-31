@@ -218,6 +218,21 @@ inline __device__ void matmul_kernel_coalesced(float *lhs, float *rhs,
   return;
 }
 
+// SPECILISED KERNEL FOR CHOREO, INPS/OUTS are all SM buffer
+template <const int M, const int N, const int K, const int THD_Y,
+          const int THD_X>
+inline __device__ void matmul_kernel_at_shared(float *lhs, float *rhs,
+                                               float *out) {
+  for (int m = 0; m < CEIL_DIV(M, THD_Y); m++)
+    for (int n = 0; n < CEIL_DIV(N, THD_X); n++)
+      for (int k = 0; k < K; k++)
+        out[m * THD_Y * N + threadIdx.y * N + n * THD_X + threadIdx.x] +=
+          lhs[m * THD_Y * K + threadIdx.y * K + k] *
+          rhs[k * N + THD_X * n + threadIdx.x];
+  __syncthreads();
+  return;
+}
+
 // template <const int M, const int N, const int K, const int THD_Y, const int
 // THD_X> inline __device__ void matmul_kernel_coalesced_v(float4 *lhs, float4
 // *rhs,

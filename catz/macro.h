@@ -13,8 +13,15 @@ namespace catz {
 
 // TODO: impl volume
 // TODO: Matrix own.
+// #define MAKE_SHARED_MATRIX(matrixVar, shape, type)                             \
+//   __shared__ type matrixVar##_data[(shape).volume()];                          \
+//   auto matrixVar = make_matrix(matrixVar##_data, shape)
+
 #define MAKE_SHARED_MATRIX(matrixVar, shape, type)                             \
   __shared__ type matrixVar##_data[(shape).volume()];                          \
+  for (int i = threadIdx.y*blockDim.x + threadIdx.x; i < (shape).volume(); i += blockDim.x * blockDim.y) {  \
+      matrixVar##_data[i] = 0.0;                                                   \
+  }                                                                                 \
   auto matrixVar = make_matrix(matrixVar##_data, shape)
 
 #define MAKE_LOCAL_MATRIX(matrixVar, shape, type)                              \
@@ -41,7 +48,8 @@ namespace catz {
 
 // TEST UTILS
 // static check at compile time
-#define SCHECK(cond) static_assert(cond, "compile-time check failed\n")
+#define SCHECK(cond)                                                           \
+  static_assert(cond, "compile-time assertion check failed\n")
 #define SCHECK_FALSE(cond) static_assert(!(cond), "compile-time check failed\n")
 
 #define CONCATENATE(x, y) x##y

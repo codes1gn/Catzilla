@@ -199,7 +199,8 @@ struct Matrix {
 
   // operator '<=' is syntax sugar that combines dist-to-threads and '='
   // operator
-  constexpr inline __device__ void operator<=(const Matrix &other) {
+  template <typename NewShapeType, typename NewStrideType>
+  constexpr inline __device__ void operator<=(const Matrix<T, NewShapeType, NewStrideType> &other) {
     // can make 11352
     auto total_threads = IndexDyn(blockDim.x * blockDim.y);
     // int total_threads = 256;
@@ -222,7 +223,6 @@ struct Matrix {
     //     = ((other.data))[i * total_threads *4096
     //                        /32
     //                      + row_other * 4096 + col_other];
-#pragma unroll 16
     for (int i = 0; i < (total_elements / total_threads).value; i++)
       (data)[(i * total_threads * stride.rows / shape.cols +
               row_this * stride.rows + col_this)

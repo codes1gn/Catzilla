@@ -100,10 +100,10 @@ int main(int argc, char **argv) {
   // randomise(B, K * N);
 
   // ranges(A, M * K, 256);
-  ranges(B, K * N, 16);
+  // ranges(B, K * N, 16);
 
   ones(A, M * K);
-  // ones(B, K * N);
+  ones(B, K * N);
 
   cudaCheck(cudaMalloc((void **)&dA, sizeof(float) * M * K));
   cudaCheck(cudaMalloc((void **)&dB, sizeof(float) * K * N));
