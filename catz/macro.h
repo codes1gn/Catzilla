@@ -4,7 +4,7 @@
 namespace catz {
 
 // KERNEL UTILS
-#define CEIL_DIV(dividend, divisor) (((dividend) + (divisor)-1) / (divisor))
+#define CEIL_DIV(dividend, divisor) (((dividend) + (divisor) - 1) / (divisor))
 
 #define MAKE_SHARED(matrixVar, size, type)                                     \
   __shared__ type matrixVar##_data[size];                                      \
@@ -13,19 +13,23 @@ namespace catz {
 
 // TODO: impl volume
 // TODO: Matrix own.
-// #define MAKE_SHARED_MATRIX(matrixVar, shape, type)                             \
-//   __shared__ type matrixVar##_data[(shape).volume()];                          \
-//   auto matrixVar = make_matrix(matrixVar##_data, shape)
+// #define MAKE_SHARED_MATRIX(matrixVar, shape, type) \
+//   __shared__ type matrixVar##_data[(shape).volume()]; \ auto matrixVar =
+//   make_matrix(matrixVar##_data, shape)
 
 #define MAKE_SHARED_MATRIX(matrixVar, shape, type)                             \
   __shared__ type matrixVar##_data[(shape).volume()];                          \
-  for (int i = threadIdx.y*blockDim.x + threadIdx.x; i < (shape).volume(); i += blockDim.x * blockDim.y) {  \
-      matrixVar##_data[i] = 0.0;                                                   \
-  }                                                                                 \
+  for (int i = threadIdx.y * blockDim.x + threadIdx.x; i < (shape).volume();   \
+       i += blockDim.x * blockDim.y) {                                         \
+    matrixVar##_data[i] = 0.0;                                                 \
+  }                                                                            \
   auto matrixVar = make_matrix(matrixVar##_data, shape)
 
 #define MAKE_LOCAL_MATRIX(matrixVar, shape, type)                              \
-  type matrixVar##_data[(shape).volume()] = {0.};                              \
+  type matrixVar##_data[(shape).volume()];                                     \
+  for (int i = 0; i < (shape).volume(); ++i) {                                 \
+    matrixVar##_data[i] = 0.0;                                                 \
+  }                                                                            \
   auto matrixVar = make_matrix(matrixVar##_data, shape)
 
 #define MAKE_SHARED(matrixVar, size_x, size_y, type)                           \
