@@ -131,6 +131,68 @@ inline __device__ void mma_m16n8k16_f16f32(float *d, const half *a,
   d[row_c_ex * 8 + col_c + 1] = D[3];
 }
 
+template <typename LShapeT, typename RShapeT, typename LStrideT,
+          typename RStrideT>
+inline __device__ void
+mma_m16n8k8_f16f32_choreo(float *D, Matrix<half, LShapeT, LStrideT> a,
+                          Matrix<half, RShapeT, RStrideT> b, float *C) {
+  // TODO:
+  // make decl inside
+  // wrap mma.sync as kernel itself
+  // resolve hardcode of shape shifts
+  unsigned A[2];
+  unsigned B[1];
+
+  // initialize_unsigned_half(A, 2, __float2half(1.0f));
+  // initialize_unsigned_half(B, 1, __float2half(1.0f));
+  a.load_fragments(A);
+  b.load_fragments(B);
+  // c.load_fragments_c(C);
+
+  asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32 "
+               " { %0, %1, %2, %3 }, "
+               " { %4, %5 }, "
+               " { %6 }, "
+               " { %7, %8, %9, %10 };"
+               : "=f"(D[0]), "=f"(D[1]), "=f"(D[2]), "=f"(D[3])
+               : "r"(A[0]), "r"(A[1]), "r"(B[0]), "f"(C[0]), "f"(C[1]),
+                 "f"(C[2]), "f"(C[3]));
+
+  // d.store_fragments_c(D);
+}
+
+template <typename OShapeT, typename LShapeT, typename RShapeT,
+          typename OStrideT, typename LStrideT, typename RStrideT>
+inline __device__ void mma_m16n8k8_f16f32_choreo(
+    Matrix<float, OShapeT, OStrideT> d, Matrix<half, LShapeT, LStrideT> a,
+    Matrix<half, RShapeT, RStrideT> b, Matrix<float, OShapeT, OStrideT> c) {
+  // TODO:
+  // make decl inside
+  // wrap mma.sync as kernel itself
+  // resolve hardcode of shape shifts
+  unsigned A[2];
+  unsigned B[1];
+  float C[4];
+  float D[4];
+
+  // initialize_unsigned_half(A, 2, __float2half(1.0f));
+  // initialize_unsigned_half(B, 1, __float2half(1.0f));
+  a.load_fragments(A);
+  b.load_fragments(B);
+  c.load_fragments_c(C);
+
+  asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32 "
+               " { %0, %1, %2, %3 }, "
+               " { %4, %5 }, "
+               " { %6 }, "
+               " { %7, %8, %9, %10 };"
+               : "=f"(D[0]), "=f"(D[1]), "=f"(D[2]), "=f"(D[3])
+               : "r"(A[0]), "r"(A[1]), "r"(B[0]), "f"(C[0]), "f"(C[1]),
+                 "f"(C[2]), "f"(C[3]));
+
+  d.store_fragments_c(D);
+}
+
 inline __device__ void mma_m16n8k8_f16f32_neo(MatrixDyn<float> d,
                                               MatrixDyn<half> a,
                                               MatrixDyn<half> b,

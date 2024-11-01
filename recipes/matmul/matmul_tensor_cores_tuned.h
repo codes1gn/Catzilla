@@ -141,13 +141,11 @@ __global__ void _matmul_tuned_with_mma_kernel(int M, int N, int K, float alpha,
     for (auto m = I(0); m < make_index<CEIL_DIV(M_TILE, Y_THREAD)>(); ++m) {
       for (auto kin = I(0); kin < make_index<CEIL_DIV(K_TILE, X_THREAD)>();
            ++kin) {
-        lhs_shared_mat
-            .tile(Coord(m, kin), per_block_data_shape)
-            .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x))) 
-          = lhs_mat
-            .tile(Coord(IndexDyn(blockIdx.y), ko), lhs_sm_tile_shape)
-            .tile(Coord(m, kin), per_block_data_shape)
-            .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
+        lhs_shared_mat.tile(Coord(m, kin), per_block_data_shape)
+            .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x))) =
+            lhs_mat.tile(Coord(IndexDyn(blockIdx.y), ko), lhs_sm_tile_shape)
+                .tile(Coord(m, kin), per_block_data_shape)
+                .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
       }
     }
     // lhs_shared_mat <= lhs_mat.tile(Coord(IndexDyn(blockIdx.y), ko),

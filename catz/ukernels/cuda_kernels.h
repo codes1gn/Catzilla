@@ -223,14 +223,33 @@ inline __device__ void matmul_kernel_coalesced(float *lhs, float *rhs,
 // SPECILISED KERNEL FOR CHOREO, INPS/OUTS are all SM buffer
 template <const int M, const int N, const int K, const int THD_Y,
           const int THD_X>
-inline __device__ void matmul_kernel_at_shared(float *lhs, float *rhs,
-                                               float *out) {
+inline __device__ void matmul_kernel_sm_stationary(float *lhs, float *rhs,
+                                                   float *out) {
+  int tid = threadIdx.y * blockDim.x + threadIdx.x;
+  int tid_y = tid / 32;
+  int tid_x = tid % 32;
   for (int m = 0; m < CEIL_DIV(M, THD_Y); m++)
     for (int n = 0; n < CEIL_DIV(N, THD_X); n++)
       for (int k = 0; k < K; k++)
-        out[m * THD_Y * N + threadIdx.y * N + n * THD_X + threadIdx.x] +=
-            lhs[m * THD_Y * K + threadIdx.y * K + k] *
-            rhs[k * N + THD_X * n + threadIdx.x];
+        out[m * THD_Y * N + tid_y * N + n * THD_X + tid_x] +=
+            lhs[m * THD_Y * K + tid_y * K + k] * rhs[k * N + THD_X * n + tid_x];
+  __syncthreads();
+  return;
+}
+
+template <const int M, const int N, const int K, const int THD_Y,
+          const int THD_X>
+inline __device__ void matmul_kernel_sm_stationary(half *lhs, half *rhs,
+                                                   float *out) {
+  int tid = threadIdx.y * blockDim.x + threadIdx.x;
+  int tid_y = tid / 32;
+  int tid_x = tid % 32;
+  for (int m = 0; m < CEIL_DIV(M, THD_Y); m++)
+    for (int n = 0; n < CEIL_DIV(N, THD_X); n++)
+      for (int k = 0; k < K; k++)
+        out[m * THD_Y * N + tid_y * N + n * THD_X + tid_x] +=
+            __half2float(lhs[m * THD_Y * K + tid_y * K + k] *
+                         rhs[k * N + THD_X * n + tid_x]);
   __syncthreads();
   return;
 }

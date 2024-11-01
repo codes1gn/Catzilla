@@ -101,23 +101,23 @@ struct Matrix {
     auto lane_rank = lane_id % shape.rows;
     auto lane_group = lane_id / shape.rows;
     const half *data_ptr = data + lane_rank * stride.rows + lane_group * I8();
-    if (shape.rows() == 16 && shape.cols() == 8) {
+    if (shape.rows == 16 && shape.cols == 8) {
       // LHS X2
       asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];"
                    : "=r"(loader[0]), "=r"(loader[1])
                    : "r"(get_smem_ptr(data_ptr)));
-    } else if (shape.rows() == 16 && shape.cols() == 16) {
+    } else if (shape.rows == 16 && shape.cols == 16) {
       // RHS X1
       asm volatile(
           "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];"
           : "=r"(loader[0]), "=r"(loader[1]), "=r"(loader[2]), "=r"(loader[3])
           : "r"(get_smem_ptr(data_ptr)));
-    } else if (shape.rows() == 8 && shape.cols() == 8) {
+    } else if (shape.rows == 8 && shape.cols == 8) {
       // LHS X4
       asm volatile("ldmatrix.sync.aligned.m8n8.x1.trans.shared.b16 {%0}, [%1];"
                    : "=r"(loader[0])
                    : "r"(get_smem_ptr(data_ptr)));
-    } else if (shape.rows() == 8 && shape.cols() == 16) {
+    } else if (shape.rows == 8 && shape.cols == 16) {
       // RHS X2
       asm volatile(
           "ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 {%0, %1}, [%2];"
@@ -131,15 +131,15 @@ struct Matrix {
       typename std::enable_if<std::is_same<U, float>::value, void>::type
       load_fragments_c(float *loader) {
     auto lane_id = IndexDyn((threadIdx.y * blockDim.x + threadIdx.x) % I32());
-    if (shape.rows() == 16 && shape.cols() == 8) {
+    if (shape.rows == 16 && shape.cols == 8) {
       loader[0] =
-          data[(lane_id / I4()) * stride.rows + (lane_id % I4()) * I2()];
-      loader[1] =
-          data[(lane_id / I4()) * stride.rows + (lane_id % I4()) * I2() + I1()];
-      loader[2] = data[(lane_id / I4()) * stride.rows +
-                       (lane_id % I4()) * I2() + I8() * stride.rows];
-      loader[3] = data[(lane_id / I4()) * stride.rows +
-                       (lane_id % I4()) * I2() + I8() * stride.rows + I1()];
+          *(data + (lane_id / I4()) * stride.rows + (lane_id % I4()) * I2());
+      loader[1] = *(data + (lane_id / I4()) * stride.rows +
+                    (lane_id % I4()) * I2() + I1());
+      loader[2] = *(data + (lane_id / I4()) * stride.rows +
+                    (lane_id % I4()) * I2() + I8() * stride.rows);
+      loader[3] = *(data + (lane_id / I4()) * stride.rows +
+                    (lane_id % I4()) * I2() + I8() * stride.rows + I1());
     }
   }
 
@@ -149,14 +149,14 @@ struct Matrix {
       store_fragments_c(float *storer) {
     auto lane_id = IndexDyn((threadIdx.y * blockDim.x + threadIdx.x) % I32());
     if (shape.rows == 16 && shape.cols == 8) {
-      data[(lane_id / I4()) * stride.rows + (lane_id % I4()) * I2()] =
+      *(data + (lane_id / I4()) * stride.rows + (lane_id % I4()) * I2()) =
           storer[0];
-      data[(lane_id / I4()) * stride.rows + (lane_id % I4()) * I2() + I1()] =
-          storer[1];
-      data[(lane_id / I4()) * stride.rows + (lane_id % I4()) * I2() +
-           I8() * stride.rows] = storer[2];
-      data[(lane_id / I4()) * stride.rows + (lane_id % I4()) * I2() +
-           I8() * stride.rows + I1()] = storer[3];
+      *(data + (lane_id / I4()) * stride.rows + (lane_id % I4()) * I2() +
+        I1()) = storer[1];
+      *(data + (lane_id / I4()) * stride.rows + (lane_id % I4()) * I2() +
+        I8() * stride.rows) = storer[2];
+      *(data + (lane_id / I4()) * stride.rows + (lane_id % I4()) * I2() +
+        I8() * stride.rows + I1()) = storer[3];
     }
   }
 
@@ -200,7 +200,8 @@ struct Matrix {
   // operator '<=' is syntax sugar that combines dist-to-threads and '='
   // operator
   template <typename NewShapeType, typename NewStrideType>
-  constexpr inline __device__ void operator<=(const Matrix<T, NewShapeType, NewStrideType> &other) {
+  constexpr inline __device__ void
+  operator<=(const Matrix<T, NewShapeType, NewStrideType> &other) {
     // can make 11352
     auto total_threads = IndexDyn(blockDim.x * blockDim.y);
     // int total_threads = 256;

@@ -57,10 +57,20 @@ inline void matmul_exec(int impl_idx, int M, int N, int K, float alpha,
     matmul_tuned_with_mma_kernel(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 16) {
     // improved from k11
-    matmul_dataflow_plus_mma(M, N, K, alpha, A, B, beta, C);
+    matmul_choreo_v2(M, N, K, alpha, A, B, beta, C);
+  } else if (impl_idx == 17) {
+    // improved from k11
+    // TODO: make half already from inputs, let them become real time measure.
+    matmul_choreo_v3(M, N, K, alpha, A, B, beta, C);
+  } else if (impl_idx == 18) {
+    // improved from k11
+    matmul_choreo_v4(M, N, K, alpha, A, B, beta, C);
+  } else if (impl_idx == 19) {
+    // improved from k11
+    matmul_choreo_v5(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 20) {
     // choreo version
-    sgemm_for_choreo(A, B, C);
+    matmul_choreo_v6_gm(M, N, K, A, B, C);
   } else {
     printf("[ERROR] kernel id not exists\n");
     exit(EXIT_FAILURE);

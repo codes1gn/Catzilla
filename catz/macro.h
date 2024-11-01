@@ -4,7 +4,7 @@
 namespace catz {
 
 // KERNEL UTILS
-#define CEIL_DIV(dividend, divisor) (((dividend) + (divisor) - 1) / (divisor))
+#define CEIL_DIV(dividend, divisor) (((dividend) + (divisor)-1) / (divisor))
 
 #define MAKE_SHARED(matrixVar, size, type)                                     \
   __shared__ type matrixVar##_data[size];                                      \

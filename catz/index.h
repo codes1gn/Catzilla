@@ -93,7 +93,7 @@ constexpr bool operator<(const Lhs &lhs, const Rhs &rhs) {
   //     return Index<lhs op Value>{};                                    \
   // }                                                                    \
 
-#define DEFINE_POINTER_OPERATOR_FOR_INDEX(op)                                  \
+#define DEFINE_POINTER_OPERATOR_FOR_INDEX_AND_FLOAT(op)                        \
   /* need to constraint allowed type */                                        \
   /* float* + Index */                                                         \
   template <int Value>                                                         \
@@ -115,14 +115,38 @@ constexpr bool operator<(const Lhs &lhs, const Rhs &rhs) {
     return ptr op index.value;                                                 \
   }
 
+#define DEFINE_POINTER_OPERATOR_FOR_INDEX_AND_HALF(op)                         \
+  /* need to constraint allowed type */                                        \
+  /* half* + Index */                                                          \
+  template <int Value>                                                         \
+  constexpr __device__ half *operator op(half *ptr,                            \
+                                         const Index<Value> &index) {          \
+    return ptr op index.value;                                                 \
+  }                                                                            \
+  /* Index + half* */                                                          \
+  template <int Value>                                                         \
+  constexpr __device__ half *operator op(const Index<Value> &index,            \
+                                         half *ptr) {                          \
+    return ptr op index.value;                                                 \
+  }                                                                            \
+  constexpr __device__ half *operator op(half *ptr, const IndexDyn &index) {   \
+    return ptr op index.value;                                                 \
+  }                                                                            \
+  /* Index + half* */                                                          \
+  constexpr __device__ half *operator op(const IndexDyn &index, half *ptr) {   \
+    return ptr op index.value;                                                 \
+  }
+
 DEFINE_BINARY_OPERATOR_FOR_INDEX(+)
 DEFINE_BINARY_OPERATOR_FOR_INDEX(-)
 DEFINE_BINARY_OPERATOR_FOR_INDEX(*)
 DEFINE_BINARY_OPERATOR_FOR_INDEX(/)
 DEFINE_BINARY_OPERATOR_FOR_INDEX(%)
 
-DEFINE_POINTER_OPERATOR_FOR_INDEX(+)
-DEFINE_POINTER_OPERATOR_FOR_INDEX(-)
+DEFINE_POINTER_OPERATOR_FOR_INDEX_AND_FLOAT(+)
+DEFINE_POINTER_OPERATOR_FOR_INDEX_AND_FLOAT(-)
+DEFINE_POINTER_OPERATOR_FOR_INDEX_AND_HALF(+)
+DEFINE_POINTER_OPERATOR_FOR_INDEX_AND_HALF(-)
 
 // define special ceil-div
 template <int Value, int OtherValue>
