@@ -195,7 +195,7 @@ void matmul_dataflow_plus_mma(int M, int N, int K, float alpha, float *A,
   const int THREADS = 256;
   // sec 3, K_TILE >= N_THREAD, AND M_THREAD
   // K_TILE > tb_shape.rows()
-  dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
+  dim3 gridDim(CEIL_DIV(N, N_TILE), CEIL_DIV(M, M_TILE));
   dim3 blockDim(THREADS);
   cudaFuncSetAttribute(_matmul_dataflow_plus_mma<M_TILE, N_TILE, K_TILE, M_REG,
                                                  N_REG, K_REG, THREADS>,
