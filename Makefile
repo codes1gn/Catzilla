@@ -1,4 +1,4 @@
-.PHONY: all build debug clean profile report-profile bench bench-all cuobjdump
+.PHONY: all build debug clean profile report-profile bench bench-all cuobjdump todo
 
 CMAKE := cmake
 
@@ -165,4 +165,29 @@ ifneq ($(wildcard $(BENCHMARK_DIR)/$(PREFIX)catzilla-kernel-$(KERNEL).ncu-rep),)
 else
     FILE_EXISTS := 0
 endif
+
+# 定义源代码目录
+SRC_DIR := catz recipes benchmark
+
+# 定义文件扩展名（可以根据需要扩展）
+SRC_EXTENSIONS := c cpp h py hpp cu
+
+# 构建 grep 的文件匹配模式
+SRC_FILES := $(foreach ext,$(SRC_EXTENSIONS),$(shell find $(SRC_DIR) -type f -name "*.$(ext)"))
+
+# ANSI 颜色代码
+BLUE := \\x1b[34m
+RESET := \\x1b[0m
+
+todo:
+	@echo "Searching for TODOs in source files..."
+	@echo "======================================"
+	@for file in $(SRC_FILES); do \
+            echo -e "\nFile: $$file"; \
+            echo -e "----------------"; \
+	    grep -n -A 2 "TODO" $$file | sed "s/TODO/$$(echo -e '$(BLUE)')TODO$$(echo -e '$(RESET)')/g" | sed 's/^/  /'; \
+        done
+	@echo "======================================"
+	@echo "Done."
+
 
