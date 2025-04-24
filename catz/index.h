@@ -62,6 +62,27 @@ constexpr bool operator<(const Lhs &lhs, const Rhs &rhs) {
   return lhs.value < rhs.value;
 }
 
+#define DEFINE_BINARY_PREDICATE_FOR_INDEX(op)                                   \
+  template <int Value, int OtherValue>                                         \
+  constexpr auto operator op(const Index<Value> &lhs,                          \
+                             const Index<OtherValue> &rhs) {                   \
+    return Value op OtherValue;                                       \
+  }                                                                            \
+                                                                               \
+  template <int Value>                                                         \
+  constexpr auto operator op(const IndexDyn &lhs, const Index<Value> &rhs) {   \
+    return lhs.value op Value;                                       \
+  }                                                                            \
+                                                                               \
+  template <int Value>                                                         \
+  constexpr auto operator op(const Index<Value> &lhs, const IndexDyn &rhs) {   \
+    return lhs.value op rhs.value;                                   \
+  }                                                                            \
+                                                                               \
+  constexpr auto operator op(const IndexDyn &lhs, const IndexDyn &rhs) {       \
+    return lhs.value op rhs.value;                                   \
+  }                                                                            \
+
 #define DEFINE_BINARY_OPERATOR_FOR_INDEX(op)                                   \
   template <int Value, int OtherValue>                                         \
   constexpr auto operator op(const Index<Value> &lhs,                          \
@@ -136,6 +157,9 @@ constexpr bool operator<(const Lhs &lhs, const Rhs &rhs) {
   constexpr __device__ half *operator op(const IndexDyn &index, half *ptr) {   \
     return ptr op index.value;                                                 \
   }
+
+DEFINE_BINARY_PREDICATE_FOR_INDEX(==)
+DEFINE_BINARY_PREDICATE_FOR_INDEX(<)
 
 DEFINE_BINARY_OPERATOR_FOR_INDEX(+)
 DEFINE_BINARY_OPERATOR_FOR_INDEX(-)

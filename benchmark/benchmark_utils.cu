@@ -149,6 +149,18 @@ void runCublasFP32(cublasHandle_t handle, int M, int N, int K, float alpha,
                CUBLAS_GEMM_DEFAULT_TENSOR_OP);
 }
 
+void runCublasFP16(cublasHandle_t handle, int M, int N, int K, float alpha,
+                   float *A, float *B, float beta, float *C) {
+  // cuBLAS uses column-major order. So we change the order of our row-major A &
+  // B, since (B^T*A^T)^T = (A*B)
+  // This runs cuBLAS in full fp32 mode
+  // cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH);
+  cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH);
+  cublasGemmEx(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, M, K, &alpha, B, CUDA_R_32F,
+               N, A, CUDA_R_32F, K, &beta, C, CUDA_R_32F, N, CUBLAS_COMPUTE_16F,
+               CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+}
+
 void runCublasBF16(cublasHandle_t handle, int M, int N, int K, float alpha,
                    float *A, float *B, float beta, float *C) {
   // This runs cuBLAS with mixed precision (performing the mul with operands
@@ -172,5 +184,6 @@ void runCublasTF32(cublasHandle_t handle, int M, int N, int K, float alpha,
 // TODO: omit this wrapper
 void run_reference(int M, int N, int K, float alpha, float *A, float *B,
                    float beta, float *C, cublasHandle_t handle) {
-  runCublasBF16(handle, M, N, K, alpha, A, B, beta, C);
+  // runCublasFP16(handle, M, N, K, alpha, A, B, beta, C);
+  runCublasFP32(handle, M, N, K, alpha, A, B, beta, C);
 }

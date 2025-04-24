@@ -27,3 +27,12 @@
 
 *. add TODO to baseline accrucy : pending, leave to latter dev
 *. handle C reuse issue : we fine, we can work now, and not become bottleneck yet.
+
+
+
+================ NEW TODOS =====================
+// TODO:
+// 1. verbose print for debug
+// 2. logic support for index arith and logic
+// 3. make it correct
+// 4. fit with choreo

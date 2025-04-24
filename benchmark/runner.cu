@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
   // randomise(A, M * K);
   // randomise(B, K * N);
 
-  ranges(A, M * K, 256);
+  ranges(A, M * K, 128*128);
   // ranges(B, K * N, 16);
 
   // ones(A, M * K);
@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
       std::cout << "Failed to pass the correctness verification against NVIDIA "
                    "cuBLAS."
                 << std::endl;
-      // exit(EXIT_FAILURE);
+      exit(EXIT_FAILURE);
     }
   }
 

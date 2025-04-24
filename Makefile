@@ -129,19 +129,19 @@ dev-m16n8k16: build
 dev-m16n8k8: build
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 16 -size-n 8 -size-k 8
 
-dev: build 
+dev16: build 
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 16 -size-n 16 -size-k 16
 
-dev2: build 
+dev32: build 
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 32 -size-n 32 -size-k 32
 
-dev3: build 
+dev64: build 
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 64 -size-n 64 -size-k 64
 
-dev4: build 
+dev128: build 
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 128 -size-n 128 -size-k 128
 
-dev5: build 
+dev256: build 
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 256 -size-n 256 -size-k 256
 
 test: build-tests 
