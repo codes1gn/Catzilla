@@ -73,7 +73,7 @@ inline void matmul_exec(int impl_idx, int M, int N, int K, float alpha,
     // choreo version
     matmul_choreo_v6_gm(M, N, K, A, B, C);
   } else if (impl_idx == 23) {
-    __choreo_gpu_matmul_host(A, B, C);
+    __choreo_gpu_matmul_host(M, N, K, A, B, C);
   } else {
     printf("[ERROR] kernel id not exists\n");
     exit(EXIT_FAILURE);

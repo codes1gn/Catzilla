@@ -3,6 +3,41 @@
 
 namespace catz {
 
+#define PRINT_MATRIX(data) \
+    printMatrix(data, #data)
+
+template <typename T>
+__device__ void printMatrix(const T& data, const char* label) {
+  if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0) {
+    printf("===================== %s ===================\n", label);
+    for (int i = 0; i < data.shape.rows; i++) {
+      for (int j = 0; j < data.shape.cols; j++) {
+        printf("%.2f ", static_cast<float>(data.data[i * data.stride.rows() + j * data.stride.cols()]));
+      }
+      printf("\n");
+    }
+  }
+}
+
+#define ASSERT_EQUAL_MATRIX(lhs, rhs) \
+    assertEqualMatrix(lhs, rhs, #lhs, #rhs)
+
+template <typename T1, typename T2>
+__device__ void assertEqualMatrix(const T1& lhs, const T2& rhs, const char* lhs_label, const char* rhs_label) {
+  if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0) {
+    printf("===================== Check if << %s == %s >> ===================\n", lhs_label, rhs_label);
+    assert(lhs.shape.rows == rhs.shape.rows);
+    assert(lhs.shape.cols == rhs.shape.cols);
+    for (int i = 0; i < lhs.shape.rows; i++) {
+      for (int j = 0; j < lhs.shape.cols; j++) {
+        assert(lhs.data[i * data.stride.rows() + j * data.stride.cols()] 
+            == rhs.data[i * data.stride.rows() + j * data.stride.cols()]);
+      }
+    }
+    printf("===================== Check Passed ===================\n");
+  }
+}
+
 // KERNEL UTILS
 #define CEIL_DIV(dividend, divisor) (((dividend) + (divisor)-1) / (divisor))
 
@@ -60,7 +95,6 @@ namespace catz {
 
 #define CUDA_KERNEL_NAME(name) CONCATENATE(name, _cuda)
 
-// 检查 CUDA 错误的宏
 #define CUDA_CHECK_ERROR()                                                     \
   do {                                                                         \
     cudaError_t err = cudaGetLastError();                                      \
