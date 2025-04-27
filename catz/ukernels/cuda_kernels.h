@@ -207,15 +207,20 @@ template <const int M, const int N, const int K, const int THD_Y,
 inline __device__ void matmul_kernel_coalesced(float *lhs, float *rhs,
                                                float *out) {
   int tid = threadIdx.y * blockDim.x + threadIdx.x;
-  int tid_y = tid / 32;
-  int tid_x = tid % 32;
-  for (int k = 0; k < K; k++)
-#pragma unroll
-    for (int m = 0; m < CEIL_DIV(M, THD_Y); m++)
-#pragma unroll
-      for (int n = 0; n < CEIL_DIV(N, THD_X); n++)
-        out[m * CEIL_DIV(N, THD_X) + n] +=
-            lhs[m * THD_Y * K + tid_y * K + k] * rhs[k * N + THD_X * n + tid_x];
+  int tid_y = tid / THD_X;
+  int tid_x = tid % THD_X;
+  for (int k = 0; k < K; k++) {
+    // if (tid == 0) printf("k = %d\n", k);
+    for (int m = 0; m < CEIL_DIV(M, THD_Y); m+=1) {
+      // if (tid == 0) printf("  m = %d\n", m);
+      for (int n = 0; n < CEIL_DIV(N, THD_X); n+=1) {
+        // if (tid == 0) printf("    n = %d\n", n);
+        out[(m) * CEIL_DIV(N, THD_X) + (n)] +=
+            lhs[(m * THD_X + tid_y) * K + k] * rhs[k * N + (n * THD_X + tid_x)];
+        // if (tid == 0) printf("    output offset = %d\n", (m) * CEIL_DIV(N, THD_X) + (n));
+      }
+    }
+  }
   __syncthreads();
   return;
 }

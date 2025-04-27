@@ -153,6 +153,9 @@ __global__ void _matmul_stream_api(int M, int N, int K, float alpha, float *lhs,
                 .dist_to(Coord(
                     mreg, IndexDyn(threadIdx.x))); // (M_TILE_REG, K_TILE_SM)
                                                    // distribute to threads
+      // ASSERT_EQUAL_MATRIX(lhs_shared_mat.tile(Coord(IndexDyn(threadIdx.y), I0()), lhs_reg_tile_shape),
+      //                     lhs_mat.tile(Coord(IndexDyn(blockIdx.y), k), lhs_sm_tile_shape) // (M, K) => (M_TILE_SM, K_TILE_SM)
+      //                     .tile(Coord(IndexDyn(threadIdx.y), I0()), lhs_reg_tile_shape));
     }
     for (auto nreg = I(0); nreg < make_index<N_TILE_REG>(); ++nreg) {
       rhs_shared_mat
@@ -166,11 +169,16 @@ __global__ void _matmul_stream_api(int M, int N, int K, float alpha, float *lhs,
                                         // (M_TILE_REG, K_TILE_SM)
               .dist_to(Coord(IndexDyn(threadIdx.y), nreg));
     }
+    // ASSERT_EQUAL_MATRIX(lhs_shared_mat,
+    //                     lhs_mat.tile(Coord(IndexDyn(blockIdx.y), k), lhs_sm_tile_shape));
+    // ASSERT_EQUAL_MATRIX(rhs_shared_mat,
+    //                     rhs_mat.tile(Coord(k, IndexDyn(blockIdx.x)), rhs_sm_tile_shape));
     __syncthreads();
 
     // contract at 128x128x32 micro-kernel
     matmul_kernel_64x64x16_perthread_4x4(lhs_shared_mat.data,
                                          rhs_shared_mat.data, partial_sum.data);
+    // PRINT_MATRIX(partial_sum);
   }
   __syncthreads();
 
@@ -241,8 +249,15 @@ __global__ void _matmul_stream_api_tuned(int M, int N, int K, float alpha,
             lhs_mat.tile(Coord(IndexDyn(blockIdx.y), ko), lhs_sm_tile_shape)
                 .tile(Coord(m, kin), per_block_data_shape)
                 .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
+        __syncthreads();
+        // PRINT_MATRIX(lhs_shared_mat
+        //                .tile(Coord(m, kin), per_block_data_shape));
+        // PRINT_MATRIX(lhs_mat.tile(Coord(IndexDyn(blockIdx.y), ko), lhs_sm_tile_shape)
+        //                .tile(Coord(m, kin), per_block_data_shape));
       }
     }
+    // PRINT_MATRIX(lhs_shared_mat);
+    // ASSERT_EQUAL_MATRIX(lhs_shared_mat, lhs_mat.tile(Coord(IndexDyn(blockIdx.y), ko), lhs_sm_tile_shape));
     for (auto kin = I(0); kin < make_index<CEIL_DIV(K_TILE, Y_THREAD)>();
          ++kin) {
       for (auto n = I(0); n < make_index<CEIL_DIV(N_TILE, X_THREAD)>(); ++n) {
@@ -255,9 +270,14 @@ __global__ void _matmul_stream_api_tuned(int M, int N, int K, float alpha,
     }
     __syncthreads();
 
+    // WHY this two changed
     // contract at 128x128x32 micro-kernel
+    // PRINT_MATRIX(lhs_shared_mat);
+    // PRINT_MATRIX(rhs_shared_mat);
+    __syncthreads();
     matmul_kernel_coalesced<M_TILE, N_TILE, K_TILE, Y_THREAD, X_THREAD>(
         lhs_shared_mat.data, rhs_shared_mat.data, partial_sum.data);
+    // PRINT_MATRIX(partial_sum);
   }
   __syncthreads();
 

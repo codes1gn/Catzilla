@@ -4,15 +4,34 @@
 namespace catz {
 
 #define PRINT_MATRIX(data) \
-    printMatrix(data, #data)
+    printMatrixFloat(data, #data)
+
+#define PRINT_MATRIX_F(data) \
+    printMatrixFloat(data, #data)
+
+#define PRINT_MATRIX_I(data) \
+    printMatrixInt(data, #data)
 
 template <typename T>
-__device__ void printMatrix(const T& data, const char* label) {
-  if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0) {
+__device__ void printMatrixFloat(const T& data, const char* label) {
+  if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0 && threadIdx.y == 0) {
     printf("===================== %s ===================\n", label);
     for (int i = 0; i < data.shape.rows; i++) {
       for (int j = 0; j < data.shape.cols; j++) {
-        printf("%.2f ", static_cast<float>(data.data[i * data.stride.rows() + j * data.stride.cols()]));
+        printf("%6.1f ", static_cast<float>(data.data[i * data.stride.rows() + j * data.stride.cols()]));
+      }
+      printf("\n");
+    }
+  }
+}
+
+template <typename T>
+__device__ void printMatrixInt(const T& data, const char* label) {
+  if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0 && threadIdx.y == 0) {
+    printf("===================== %s ===================\n", label);
+    for (int i = 0; i < data.shape.rows; i++) {
+      for (int j = 0; j < data.shape.cols; j++) {
+        printf("%d ", static_cast<float>(data.data[i * data.stride.rows() + j * data.stride.cols()]));
       }
       printf("\n");
     }

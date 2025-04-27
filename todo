@@ -32,7 +32,4 @@
 
 ================ NEW TODOS =====================
 // TODO:
-// 1. verbose print for debug
-// 2. logic support for index arith and logic
-// 3. make it correct
-// 4. fit with choreo
+1. fix all other kernels: 1-5 all fine; 

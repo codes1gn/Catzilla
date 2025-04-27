@@ -99,7 +99,8 @@ int main(int argc, char **argv) {
   // randomise(A, M * K);
   // randomise(B, K * N);
 
-  ranges(A, M * K, 128*128);
+  // TODO: make it follow= your jneeds
+  ranges(A, M * K, 32*32);
   // ranges(B, K * N, 128*128);
 
   // ones(A, M * K);
