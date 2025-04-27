@@ -96,15 +96,15 @@ int main(int argc, char **argv) {
   C = (float *)malloc(sizeof(float) * M * N);
   C_ref = (float *)malloc(sizeof(float) * M * N);
 
-  // randomise(A, M * K);
-  // randomise(B, K * N);
+  randomise(A, M * K);
+  randomise(B, K * N);
 
   // TODO: make it follow= your jneeds
-  ranges(A, M * K, 32*32);
+  // ranges(A, M * K, 32*32);
   // ranges(B, K * N, 128*128);
 
   // ones(A, M * K);
-  ones(B, K * N);
+  // ones(B, K * N);
 
   cudaCheck(cudaMalloc((void **)&dA, sizeof(float) * M * K));
   cudaCheck(cudaMalloc((void **)&dB, sizeof(float) * K * N));

@@ -178,6 +178,7 @@ matmul_kernel_64x64x16_perthread_4x4(float *lhs, float *rhs, float *out) {
   int N_tessel = 4;
   int tid_x = threadIdx.x;
   int tid_y = threadIdx.y;
+  __syncthreads();
   for (int k = 0; k < K; k++)
 #pragma unroll
     for (int m = 0; m < M_tessel; m++)
@@ -210,6 +211,7 @@ inline __device__ void matmul_kernel_coalesced(float *lhs, float *rhs,
   int tid_y = tid / THD_X;
   int tid_x = tid % THD_X;
   for (int k = 0; k < K; k++) {
+    __syncthreads();
     // if (tid == 0) printf("k = %d\n", k);
     for (int m = 0; m < CEIL_DIV(M, THD_Y); m+=1) {
       // if (tid == 0) printf("  m = %d\n", m);

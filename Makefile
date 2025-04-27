@@ -120,8 +120,8 @@ analysis:
 		$(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).details && \
 		vim $(BENCHMARK_DIR)/catzilla-kernel-$(KERNEL).details
 
-bench: build
-	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 100 -warmup 10
+bench%: build
+	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 100 -warmup 10 -size-m $* -size-n $* -size-k $*
 
 dev-m16n8k16: build
 	@./$(BUILD_DIR)/bin/catzilla-matmul -version ${KERNEL} -device 0 -repeat 1 -warmup 0 -size-m 16 -size-n 8 -size-k 16

@@ -136,6 +136,7 @@ __global__ void _matmul_stream_api(int M, int N, int K, float alpha, float *lhs,
   // for row: blk.y, thd.y, mreg
   // for col: k, thd.x
   for (auto k = I(0); k < make_index(CEIL_DIV(K, K_TILE_SM)); ++k) {
+    __syncthreads();
     for (auto mreg = I(0); mreg < make_index<M_TILE_REG>(); ++mreg) {
       lhs_shared_mat // (M_TILE_SM, K_TILE_SM)
           .tile(Coord(IndexDyn(threadIdx.y), I0()),
@@ -157,6 +158,7 @@ __global__ void _matmul_stream_api(int M, int N, int K, float alpha, float *lhs,
       //                     lhs_mat.tile(Coord(IndexDyn(blockIdx.y), k), lhs_sm_tile_shape) // (M, K) => (M_TILE_SM, K_TILE_SM)
       //                     .tile(Coord(IndexDyn(threadIdx.y), I0()), lhs_reg_tile_shape));
     }
+    __syncthreads();
     for (auto nreg = I(0); nreg < make_index<N_TILE_REG>(); ++nreg) {
       rhs_shared_mat
           .tile(Coord(I0(), IndexDyn(threadIdx.x)),
@@ -179,6 +181,7 @@ __global__ void _matmul_stream_api(int M, int N, int K, float alpha, float *lhs,
     matmul_kernel_64x64x16_perthread_4x4(lhs_shared_mat.data,
                                          rhs_shared_mat.data, partial_sum.data);
     // PRINT_MATRIX(partial_sum);
+    __syncthreads();
   }
   __syncthreads();
 
@@ -192,6 +195,7 @@ __global__ void _matmul_stream_api(int M, int N, int K, float alpha, float *lhs,
           .dist_to(Coord(mreg, nreg)) = partial_sum.dist_to(Coord(mreg, nreg));
     }
   }
+  __syncthreads();
 }
 
 void matmul_stream_api(int M, int N, int K, float alpha, float *A, float *B,
@@ -266,17 +270,17 @@ __global__ void _matmul_stream_api_tuned(int M, int N, int K, float alpha,
             rhs_mat.tile(Coord(ko, IndexDyn(blockIdx.x)), rhs_sm_tile_shape)
                 .tile(Coord(kin, n), per_block_data_shape)
                 .dist_to(Coord(IndexDyn(threadIdx.y), IndexDyn(threadIdx.x)));
+        __syncthreads();
       }
     }
-    __syncthreads();
 
     // WHY this two changed
     // contract at 128x128x32 micro-kernel
     // PRINT_MATRIX(lhs_shared_mat);
     // PRINT_MATRIX(rhs_shared_mat);
-    __syncthreads();
     matmul_kernel_coalesced<M_TILE, N_TILE, K_TILE, Y_THREAD, X_THREAD>(
         lhs_shared_mat.data, rhs_shared_mat.data, partial_sum.data);
+    __syncthreads();
     // PRINT_MATRIX(partial_sum);
   }
   __syncthreads();
@@ -291,6 +295,7 @@ __global__ void _matmul_stream_api_tuned(int M, int N, int K, float alpha,
           partial_sum.dist_to(Coord(m, n));
     }
   }
+  __syncthreads();
 }
 
 void matmul_stream_api_tuned(int M, int N, int K, float alpha, float *A,
@@ -313,6 +318,9 @@ void matmul_stream_api_tuned(int M, int N, int K, float alpha, float *A,
   // K_TILE > Y_THREAD
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(X_THREAD, Y_THREAD);
+  // cudaFuncAttributes attr;
+  // cudaFuncGetAttributes(&attr, _matmul_stream_api_tuned<M_TILE, N_TILE, K_TILE, X_THREAD, Y_THREAD>);
+  // printf("Shared memory size: %d bytes\n", attr.sharedSizeBytes);
   cudaFuncSetAttribute(
       _matmul_stream_api_tuned<M_TILE, N_TILE, K_TILE, X_THREAD, Y_THREAD>,
       cudaFuncAttributePreferredSharedMemoryCarveout,
