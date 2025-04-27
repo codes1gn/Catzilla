@@ -304,7 +304,9 @@ template <const int M, const int N, const int K, const int THD_Y,
           const int THD_X>
 inline __device__ void matmul_kernel_pad_swizzled(float *lhs, float *rhs,
                                                   float *out) {
-  for (int k = 0; k < K; k++)
+  __syncthreads();
+  for (int k = 0; k < K; k++) {
+    __syncthreads();
 #pragma unroll
     for (int m = 0; m < CEIL_DIV(M, THD_Y); m++)
 #pragma unroll
@@ -312,6 +314,8 @@ inline __device__ void matmul_kernel_pad_swizzled(float *lhs, float *rhs,
         out[m * CEIL_DIV(N, THD_X) + n] +=
             lhs[m * THD_Y * (K + 1) + threadIdx.y * (K + 1) + k] *
             rhs[k * (N + 1) + THD_X * n + threadIdx.x];
+
+  }
   __syncthreads();
   return;
 }
