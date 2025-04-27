@@ -1,7 +1,6 @@
 #ifndef CATZILLA_RECIPES_KERNELS_IMPORTER_H_
 #define CATZILLA_RECIPES_KERNELS_IMPORTER_H_
 
-#include "matmul/matmul_dist_to_thread.h"
 #include "matmul/matmul_outerproduct.h"
 #include "matmul/matmul_padswizzled.h"
 #include "matmul/matmul_refactored.h"
@@ -10,7 +9,6 @@
 #include "matmul/matmul_choreo_gend.h"
 #include "matmul/matmul_vanilla.h"
 #include "matmul/matmul_vload_vstore.h"
-#include "matmul/sgemm_for_choreo.h"
 
 namespace catz::recipes {
 
@@ -29,10 +27,11 @@ inline void matmul_exec(int impl_idx, int M, int N, int K, float alpha,
     matmul_stream_api_tuned(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 6) {
     matmul_pad_swizzled(M, N, K, alpha, A, B, beta, C);
-  } else if (impl_idx == 7) {
-    matmul_dist_to_thread(M, N, K, alpha, A, B, beta, C);
-  } else if (impl_idx == 8) {
-    matmul_vload_vstore(M, N, K, alpha, A, B, beta, C);
+  // } else if (impl_idx == 8) {
+    // TODO: vload should use specific API like dist_to_vthread not via Matrix<float4>
+    // since normally, we only apply vectorise to transfer or alu seperately, not from basis
+    //
+  //   matmul_vload_vstore(M, N, K, alpha, A, B, beta, C);
   // } else if (impl_idx == 9) {
   //   // wmma.mma.sync.aligned.m16n16k16.row.col.f32.f32
   //   matmul_tensor_cores_wmma_m16n16k16_f16f32(M, N, K, alpha, A, B, beta, C);
@@ -53,25 +52,8 @@ inline void matmul_exec(int impl_idx, int M, int N, int K, float alpha,
   // } else if (impl_idx == 14) {
   //   // improved from k11
   //   matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(M, N, K, alpha, A, B, beta, C);
-  // } else if (impl_idx == 15) {
-  //   // improved from k11
-  //   matmul_tuned_with_mma_kernel(M, N, K, alpha, A, B, beta, C);
-  } else if (impl_idx == 16) {
-    // improved from k11
-    matmul_choreo_v2(M, N, K, alpha, A, B, beta, C);
-  } else if (impl_idx == 17) {
-    // improved from k11
-    // TODO: make half already from inputs, let them become real time measure.
-    matmul_choreo_v3(M, N, K, alpha, A, B, beta, C);
-  } else if (impl_idx == 18) {
-    // improved from k11
-    matmul_choreo_v4(M, N, K, alpha, A, B, beta, C);
-  } else if (impl_idx == 19) {
-    // improved from k11
-    matmul_choreo_v5(M, N, K, alpha, A, B, beta, C);
-  } else if (impl_idx == 20) {
-    // choreo version
-    matmul_choreo_v6_gm(M, N, K, A, B, C);
+  } else if (impl_idx == 15) {
+    matmul_tuned_with_mma_kernel(M, N, K, alpha, A, B, beta, C);
   } else if (impl_idx == 23) {
     __choreo_gpu_matmul_host(M, N, K, A, B, C);
   } else {

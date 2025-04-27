@@ -49,8 +49,8 @@ __device__ void assertEqualMatrix(const T1& lhs, const T2& rhs, const char* lhs_
     assert(lhs.shape.cols == rhs.shape.cols);
     for (int i = 0; i < lhs.shape.rows; i++) {
       for (int j = 0; j < lhs.shape.cols; j++) {
-        assert(lhs.data[i * data.stride.rows() + j * data.stride.cols()] 
-            == rhs.data[i * data.stride.rows() + j * data.stride.cols()]);
+        assert(lhs.data[i * lhs.stride.rows() + j * lhs.stride.cols()] 
+            == rhs.data[i * rhs.stride.rows() + j * rhs.stride.cols()]);
       }
     }
     printf("===================== Check Passed ===================\n");

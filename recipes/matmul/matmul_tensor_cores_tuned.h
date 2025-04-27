@@ -138,6 +138,7 @@ __global__ void _matmul_tuned_with_mma_kernel(int M, int N, int K, float alpha,
                     float);
 
   for (auto ko = I(0); ko < make_index(CEIL_DIV(K, K_TILE)); ++ko) {
+    __syncthreads();
     for (auto m = I(0); m < make_index<CEIL_DIV(M_TILE, Y_THREAD)>(); ++m) {
       for (auto kin = I(0); kin < make_index<CEIL_DIV(K_TILE, X_THREAD)>();
            ++kin) {
