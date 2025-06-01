@@ -8,7 +8,6 @@
 #include <cuda_runtime.h>
 
 #include "macro.h"
-#include "matrix_legacy.h"
 #include "ukernels.h"
 
 using namespace catz;

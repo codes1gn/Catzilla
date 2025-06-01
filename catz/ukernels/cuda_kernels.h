@@ -9,6 +9,7 @@
 #include <mma.h>
 
 #include "matrix.h"
+#include "matrix_legacy.h"
 
 using namespace catz;
 

@@ -8,9 +8,7 @@
 
 #include "macro.h"
 #include "coord.h"
-#include "coord_legacy.h"
 #include "matrix.h"
-#include "matrix_legacy.h"
 
 using namespace catz;
 

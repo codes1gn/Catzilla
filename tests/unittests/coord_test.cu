@@ -6,9 +6,7 @@
 #include <cuda_runtime.h>
 
 #include "coord.h"
-#include "coord_legacy.h"
 #include "matrix.h"
-#include "matrix_legacy.h"
 #include "macro.h"
 
 using namespace catz;

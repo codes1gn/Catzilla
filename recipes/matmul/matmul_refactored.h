@@ -7,11 +7,9 @@
 #include <cuda_runtime.h>
 
 #include "coord.h"
-#include "coord_legacy.h"
 #include "index.h"
 #include "macro.h"
 #include "matrix.h"
-#include "matrix_legacy.h"
 #include "ukernels.h"
 
 using namespace catz;
