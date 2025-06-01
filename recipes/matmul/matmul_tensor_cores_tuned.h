@@ -18,8 +18,8 @@ using namespace catz::mma;
 namespace catz::recipes {
 
 template <const int M_TILE, const int N_TILE, const int K_TILE, const int M_REG,
-          const int N_REG, const int K_REG, const int X_THREAD,
-          const int Y_THREAD>
+          const int N_REG, const int K_REG, const int WRAP_SIZE,
+          const int WRAP_AMOUNT>
 __global__ void
 _matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(int M, int N, int K, float alpha,
                                               float *lhs, float *rhs,
@@ -88,8 +88,8 @@ void matmul_tensor_cores_mma_m16n8k8_f16f32_tuned(int M, int N, int K,
   const int K_REG = 8;
   const int WRAP_SIZE = 32;
   const int WRAP_AMOUNT = 8;
-  assert(M_REG * K_REG > X_THREAD * Y_THREAD);
-  assert(N_REG * K_REG > X_THREAD * Y_THREAD);
+  assert(M_REG * K_REG > WRAP_SIZE * WRAP_AMOUNT);
+  assert(N_REG * K_REG > WRAP_SIZE * WRAP_AMOUNT);
 
   dim3 gridDim(CEIL_DIV(M, M_TILE), CEIL_DIV(N, N_TILE));
   dim3 blockDim(WRAP_SIZE, WRAP_AMOUNT);

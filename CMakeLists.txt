@@ -14,6 +14,7 @@ FetchContent_MakeAvailable(Catch2)
 include_directories(${catch2_SOURCE_DIR}/single_include)
 
 find_package(CUDA REQUIRED)
+find_package(Threads REQUIRED)
 
 # ensure cuda is available
 include(CheckLanguage)
@@ -25,11 +26,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CUDA_EXTENSIONS OFF)
-
-# set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# set(CMAKE_CXX_EXTENSIONS OFF)
-# this is set by Makefile automatically
-# set(CUDA_COMPUTE_CAPABILITY 86)
 
 # in debug mode, add debug symbols to device code
 # this disables most optimizations and kills performance
@@ -48,8 +44,8 @@ include_directories(${CUDA_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/catz)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/recipes)
 
-# Configure the source file path to be compiled
-add_subdirectory(${PROJECT_SOURCE_DIR}/references)
+# References and version-3/6 are just for reference, not for compilation
+# add_subdirectory(${PROJECT_SOURCE_DIR}/references)
 
 # Catzilla impls on various operators
 add_subdirectory(${PROJECT_SOURCE_DIR}/catz)
@@ -97,8 +93,3 @@ add_custom_target(
     check-code-format
     DEPENDS clang_format_check_only
 )
-
-# add_custom_target(
-#     test
-#     DEPENDS tests
-# )

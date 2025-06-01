@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+always use english for code generation and comment
+always use tab size = 4 in cpp code, and tab size = 4 in python code
+allow prompt or requests described in both english and chinese, and replies with the same language (except for code)

@@ -1,33 +1,18 @@
-# 启用测试
+# Enable testing
 enable_testing()
 
-set(SOURCES "")
-set(TEST_BINARIES)
+# Add test utils first
+add_subdirectory(test_utils)
 
-file(GLOB_RECURSE CU_TEST_SOURCES "unittests/*_test.cu")
-list(APPEND SOURCES ${CU_TEST_SOURCES})
+# Add unittests
+add_subdirectory(unittests)
 
-file(GLOB_RECURSE CPP_TEST_SOURCES "unittests/*_test.cpp")
-list(APPEND SOURCES ${CPP_TEST_SOURCES})
+# Add recipe tests
+add_subdirectory(recipetests)
 
-# message(${SOURCES})
-
-# set(SOURCES "unittests/coord_test.cu")
-
-foreach(src ${SOURCES})
-  get_filename_component(binary ${src} NAME_WE)
-  add_executable(${binary} ${src})
-
-  target_link_libraries(${binary} PRIVATE catz Catch2::Catch2WithMain ${CUDA_LIBRARIES})
-
-  list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
-  include(CTest)
-  include(Catch)
-
-  catch_discover_tests(${binary})
-  list(APPEND TEST_BINARIES ${binary})
-endforeach()
-
+# Create a custom target that depends on all tests
 add_custom_target(catz_tests
-  DEPENDS ${TEST_BINARIES}
+    DEPENDS 
+    recipe_tests 
+    ${TEST_BINARIES}
 )
