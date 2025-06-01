@@ -22,10 +22,7 @@ target_link_libraries(recipe_tests PRIVATE
     ${CUDA_CUBLAS_LIBRARIES}
 )
 
-add_test(NAME recipe_cpp_tests COMMAND recipe_tests)
-
-# Register the test
-add_test(
-    NAME recipe_tests
-    COMMAND recipe_tests
-) 
+# Remove the old add_test, and use Catch2 test discovery
+include(CTest)
+include(Catch)
+catch_discover_tests(recipe_tests)

@@ -69,42 +69,70 @@ void testKernel(int kernel_version, const TestConfig& config, const char* kernel
 
 } // namespace
 
-
-TEST_CASE("MatMul Kernels - Medium Matrix (128x128)", "[matmul][medium]") {
+// Medium Matrix (128x128x128)
+TEST_CASE("MatMul_K1_M128_N128_K128", "[matmul][medium][kernel1]") {
     TestConfig config(128, 128, 128);
-    
     testKernel(1, config, "Kernel 1 - matmul_f16f32");
+}
+TEST_CASE("MatMul_K2_M128_N128_K128", "[matmul][medium][kernel2]") {
+    TestConfig config(128, 128, 128);
     testKernel(2, config, "Kernel 2 - matmul_outerproduct");
+}
+TEST_CASE("MatMul_K3_M128_N128_K128", "[matmul][medium][kernel3]") {
+    TestConfig config(128, 128, 128);
     testKernel(3, config, "Kernel 3 - matmul_affine_api");
+}
+TEST_CASE("MatMul_K4_M128_N128_K128", "[matmul][medium][kernel4]") {
+    TestConfig config(128, 128, 128);
     testKernel(4, config, "Kernel 4 - matmul_stream_api");
+}
+TEST_CASE("MatMul_K5_M128_N128_K128", "[matmul][medium][kernel5]") {
+    TestConfig config(128, 128, 128);
     testKernel(5, config, "Kernel 5 - matmul_stream_api_tuned");
+}
+TEST_CASE("MatMul_K6_M128_N128_K128", "[matmul][medium][kernel6]") {
+    TestConfig config(128, 128, 128);
     testKernel(6, config, "Kernel 6 - matmul_pad_swizzled");
+}
+TEST_CASE("MatMul_K15_M128_N128_K128", "[matmul][medium][kernel15]") {
+    TestConfig config(128, 128, 128);
     testKernel(15, config, "Kernel 15 - matmul_tuned_with_mma_kernel");
+}
+TEST_CASE("MatMul_K23_M128_N128_K128", "[matmul][medium][kernel23]") {
+    TestConfig config(128, 128, 128);
     testKernel(23, config, "Kernel 23 - choreo_gpu_matmul");
 }
 
-TEST_CASE("MatMul Kernels - Large Matrix (2048x2048)", "[matmul][large]") {
+// Large Matrix (2048x2048x2048)
+TEST_CASE("MatMul_K1_M2048_N2048_K2048", "[matmul][large][kernel1]") {
     TestConfig config(2048, 2048, 2048);
-    
     testKernel(1, config, "Kernel 1 - matmul_f16f32");
+}
+TEST_CASE("MatMul_K2_M2048_N2048_K2048", "[matmul][large][kernel2]") {
+    TestConfig config(2048, 2048, 2048);
     testKernel(2, config, "Kernel 2 - matmul_outerproduct");
+}
+TEST_CASE("MatMul_K3_M2048_N2048_K2048", "[matmul][large][kernel3]") {
+    TestConfig config(2048, 2048, 2048);
     testKernel(3, config, "Kernel 3 - matmul_affine_api");
+}
+TEST_CASE("MatMul_K4_M2048_N2048_K2048", "[matmul][large][kernel4]") {
+    TestConfig config(2048, 2048, 2048);
     testKernel(4, config, "Kernel 4 - matmul_stream_api");
+}
+TEST_CASE("MatMul_K5_M2048_N2048_K2048", "[matmul][large][kernel5]") {
+    TestConfig config(2048, 2048, 2048);
     testKernel(5, config, "Kernel 5 - matmul_stream_api_tuned");
+}
+TEST_CASE("MatMul_K6_M2048_N2048_K2048", "[matmul][large][kernel6]") {
+    TestConfig config(2048, 2048, 2048);
     testKernel(6, config, "Kernel 6 - matmul_pad_swizzled");
+}
+TEST_CASE("MatMul_K15_M2048_N2048_K2048", "[matmul][large][kernel15]") {
+    TestConfig config(2048, 2048, 2048);
     testKernel(15, config, "Kernel 15 - matmul_tuned_with_mma_kernel");
+}
+TEST_CASE("MatMul_K23_M2048_N2048_K2048", "[matmul][large][kernel23]") {
+    TestConfig config(2048, 2048, 2048);
     testKernel(23, config, "Kernel 23 - choreo_gpu_matmul");
 }
-
-// TEST_CASE("MatMul Kernels - Non-square Matrix", "[matmul][non-square]") {
-//     TestConfig config(64, 128, 32);
-//     
-//     testKernel(1, config, "Kernel 1 - matmul_f16f32");
-//     testKernel(2, config, "Kernel 2 - matmul_outerproduct");
-//     testKernel(3, config, "Kernel 3 - matmul_affine_api");
-//     testKernel(4, config, "Kernel 4 - matmul_stream_api");
-//     testKernel(5, config, "Kernel 5 - matmul_stream_api_tuned");
-//     testKernel(6, config, "Kernel 6 - matmul_pad_swizzled");
-//     testKernel(15, config, "Kernel 15 - matmul_tuned_with_mma_kernel");
-//     testKernel(23, config, "Kernel 23 - choreo_gpu_matmul");
-// } 
