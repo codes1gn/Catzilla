@@ -1,6 +1,9 @@
 # Enable testing
 enable_testing()
 
+# Initialize TEST_BINARIES
+set(TEST_BINARIES "")
+
 # Add test utils first
 add_subdirectory(test_utils)
 

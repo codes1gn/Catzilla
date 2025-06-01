@@ -20,6 +20,9 @@ find_package(Threads REQUIRED)
 include(CheckLanguage)
 check_language(CUDA)
 
+# Set CUDA compute capability
+set(CUDA_COMPUTE_CAPABILITY "80")  # Set to 80 for Ampere architecture (A100, A6000, etc)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CUDA_STANDARD 17)  # need type_traits
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -34,6 +37,9 @@ set(CMAKE_CUDA_EXTENSIONS OFF)
 # add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-G;-src-in-ptx;-lineinfo>")
 add_compile_options("$<$<AND:$<CONFIG:RelWithDebInfo>,$<COMPILE_LANGUAGE:CUDA>>:-src-in-ptx;-lineinfo>")
 # add_compile_options("--ptxas-options=-v")
+
+# Add CUDA relaxed constexpr flag
+add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

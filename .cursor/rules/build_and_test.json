@@ -1,0 +1,40 @@
+{
+    "version": 1,
+    "rules": [
+        {
+            "description": "Build project",
+            "command": "make build",
+            "match": {
+                "trigger": "command",
+                "pattern": "^make\\s+build$"
+            }
+        },
+        {
+            "description": "Run all tests",
+            "command": "make test",
+            "match": {
+                "trigger": "command",
+                "pattern": "^make\\s+test$"
+            }
+        },
+        {
+            "description": "Run benchmark with specific kernel and size",
+            "command": "make bench${size} KERNEL=${kernel}",
+            "match": {
+                "trigger": "command",
+                "pattern": "^make\\s+bench(\\d+)\\s+KERNEL=(\\w+)$",
+                "variables": {
+                    "size": "$1",
+                    "kernel": "$2"
+                }
+            },
+            "validate": {
+                "size": {
+                    "type": "number",
+                    "pattern": "^(1|2|4|8|16|32|64|128|256|512|1024|2048|4096|8192)$",
+                    "error": "Size must be a power of 2"
+                }
+            }
+        }
+    ]
+} 
